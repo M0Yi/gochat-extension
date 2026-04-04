@@ -2,7 +2,7 @@ import {
   resolveLoggerBackedRuntime,
   type RuntimeEnv,
 } from "openclaw/plugin-sdk/extension-shared";
-import { resolveGoChatAccount } from "../accounts.js";
+import { resolveGoChatAccount, listGoChatAccountIds } from "../accounts.js";
 import { handleGoChatInbound } from "../inbound.js";
 import { getGoChatRuntime } from "../runtime.js";
 import { createRelayWSConnection } from "./relay-ws.js";
@@ -11,6 +11,24 @@ import type {
   CoreConfig,
   GoChatInboundMessage,
 } from "../types.js";
+
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+let _pluginVersion: string | null = null;
+
+function getPluginVersion(): string {
+  if (_pluginVersion) return _pluginVersion;
+  try {
+    const manifestPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../package.json");
+    const raw = readFileSync(manifestPath, "utf-8");
+    _pluginVersion = JSON.parse(raw).version ?? "unknown";
+  } catch {
+    _pluginVersion = "unknown";
+  }
+  return _pluginVersion;
+}
 
 export async function monitorGoChatProvider(
   opts: {
@@ -42,6 +60,8 @@ export async function monitorGoChatProvider(
     accountId: account.accountId,
   });
 
+  const startedAt = Date.now();
+
   const { start: startRelay, stop: stopRelay, send: sendRelay } = createRelayWSConnection({
     platformUrl: account.relayPlatformUrl,
     channelId: account.channelId,
@@ -69,6 +89,15 @@ export async function monitorGoChatProvider(
       logger.error(`[gochat:${account.accountId}] relay error: ${error.message}`);
     },
     abortSignal: opts.abortSignal,
+    statusProvider: () => {
+      const accountIds = listGoChatAccountIds(cfg);
+      return {
+        version: getPluginVersion(),
+        agentCount: accountIds.length,
+        status: "idle",
+        uptime: Math.floor((Date.now() - startedAt) / 1000),
+      };
+    },
   });
 
   if (opts.abortSignal?.aborted) {

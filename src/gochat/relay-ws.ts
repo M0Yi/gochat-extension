@@ -2,6 +2,13 @@ import crypto from "node:crypto";
 
 import type { WebSocket as WS } from "ws";
 
+export interface RelayStatusPayload {
+  version: string;
+  agentCount: number;
+  status: "idle" | "working";
+  uptime: number;
+}
+
 export interface RelayWSOptions {
   platformUrl: string;
   channelId: string;
@@ -9,6 +16,7 @@ export interface RelayWSOptions {
   onMessage: (message: any) => void | Promise<void>;
   onError?: (error: Error) => void;
   abortSignal?: AbortSignal;
+  statusProvider?: () => RelayStatusPayload | null;
 }
 
 type WSInstance = InstanceType<typeof WS>;
@@ -27,13 +35,14 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
   send: (data: any) => void;
   stop: () => void;
 } {
-  const { platformUrl, channelId, secret, onMessage, onError, abortSignal } = opts;
+  const { platformUrl, channelId, secret, onMessage, onError, abortSignal, statusProvider } = opts;
 
   let ws: WSInstance | null = null;
   let stopped = false;
   let backoffMs = INITIAL_BACKOFF_MS;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let pingTimer: ReturnType<typeof setTimeout> | null = null;
+  const startedAt = Date.now();
 
   function log(level: "info" | "warn" | "error", msg: string): void {
     const prefix = `[gochat:relay:${channelId}]`;
@@ -184,6 +193,18 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
       }
       try {
         ws.send(JSON.stringify({ type: "ping" }));
+        if (statusProvider) {
+          const sp = statusProvider();
+          if (sp) {
+            ws.send(JSON.stringify({
+              type: "status",
+              version: sp.version,
+              agentCount: sp.agentCount,
+              status: sp.status,
+              uptime: sp.uptime,
+            }));
+          }
+        }
       } catch (err) {
         log("warn", `ping failed: ${err instanceof Error ? err.message : String(err)}`);
       }
