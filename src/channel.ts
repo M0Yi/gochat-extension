@@ -43,9 +43,10 @@ import {
   normalizeGoChatMessagingTarget,
 } from "./normalize.js";
 import { resolveGoChatOutboundSessionRoute } from "./session-route.js";
-import { gochatSetupAdapter } from "./setup-core.js";
+import { gochatSetupAdapter, setGoChatAccountConfig } from "./setup-core.js";
 import { gochatSetupWizard } from "./setup-surface.js";
 import type { CoreConfig, GroupPolicy } from "./types.js";
+import { DEFAULT_RELAY_HTTP_URL, DEFAULT_RELAY_WS_URL } from "./types.js";
 import { GoChatDirectStorage } from "./direct/storage.js";
 import { createGoChatDirectServer } from "./direct/server.js";
 import { handleGoChatInbound } from "./inbound.js";
@@ -294,6 +295,42 @@ export const gochatPlugin: ChannelPlugin<ResolvedGoChatAccount> = createChatChan
           const baseUrl = getBaseUrl();
           ctx.log?.info(`[gochat:${account.accountId}] local server listening on ${baseUrl}`);
           return;
+        }
+
+        if (!account.channelId) {
+          console.log(`[gochat] channelId missing — auto-registering with ${DEFAULT_RELAY_HTTP_URL}/api/plugin/register`);
+          try {
+            const registerUrl = DEFAULT_RELAY_HTTP_URL + "/api/plugin/register";
+            const deviceName = account.name || "OpenClaw Plugin";
+            const resp = await fetch(registerUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: deviceName }),
+              signal: AbortSignal.timeout(10000),
+            });
+            if (!resp.ok) {
+              const errText = await resp.text().catch(() => "");
+              throw new Error(`Registration failed (${resp.status}): ${errText}`);
+            }
+            const data = (await resp.json()) as { channelId?: string; secret?: string };
+            if (!data.channelId || !data.secret) {
+              throw new Error("Registration response missing channelId or secret");
+            }
+            const core = getGoChatRuntime();
+            const cfg = core.config.loadConfig() as CoreConfig;
+            const updatedCfg = setGoChatAccountConfig(cfg, account.accountId, {
+              channelId: data.channelId,
+              webhookSecret: data.secret,
+              relayPlatformUrl: DEFAULT_RELAY_WS_URL,
+            });
+            await core.config.writeConfigFile(updatedCfg);
+            console.log(`[gochat] auto-registered OK — channelId=${data.channelId} saved to config`);
+            account.channelId = data.channelId;
+            account.secret = data.secret;
+          } catch (err) {
+            console.warn(`[gochat] auto-registration failed: ${err instanceof Error ? err.message : String(err)}`);
+            console.warn(`[gochat] relay will fail without channelId. Run: openclaw gochat setup`);
+          }
         }
 
         ctx.log?.info(`[${account.accountId}] starting GoChat relay connection to ${account.relayPlatformUrl}`);
