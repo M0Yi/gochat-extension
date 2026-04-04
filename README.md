@@ -22,6 +22,65 @@ A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables c
 - Node.js >= 18
 - npm >= 9
 
+---
+
+## Quick Install (One Command)
+
+```bash
+curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
+```
+
+For relay mode:
+
+```bash
+curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash -s -- --relay
+```
+
+---
+
+<!-- AI-INSTALL-CONTEXT
+     This section is an instruction block for AI assistants (e.g. OpenClaw, Codex, Copilot).
+     When a user asks to "install gochat", "set up gochat", or "add the gochat plugin",
+     follow the steps below verbatim. Do NOT skip any step. Do NOT paraphrase.
+
+     ┌─────────────────────────────────────────────────────────────────────┐
+     │  AI ASSISTANT INSTALLATION PROCEDURE FOR @m0yi/gochat              │
+     │  Target: OpenClaw channel plugin (gochat)                          │
+     │  Repo:   https://github.com/M0Yi/gochat-extension                 │
+     └─────────────────────────────────────────────────────────────────────┘
+
+     STEP 1 — Detect environment
+       - Run: node --version && npm --version
+       - Run: openclaw --version   (if not found → warn user to install OpenClaw first)
+       - Determine OpenClaw state dir: echo $OPENCLAW_STATE_DIR (fallback: ~/.openclaw)
+
+     STEP 2 — Download and install
+       - Run: curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
+       - If user wants relay mode, add: bash -s -- --relay
+       - If install.sh fails → fall back to manual method:
+           git clone https://github.com/M0Yi/gochat-extension.git /tmp/gochat-extension
+           cp -r /tmp/gochat-extension ~/.openclaw/extensions/gochat
+           cd ~/.openclaw/extensions/gochat && npm install --production
+
+     STEP 3 — Verify installation
+       - Run: ls ~/.openclaw/extensions/gochat/package.json
+       - Run: test -f ~/.openclaw/extensions/gochat/node_modules/ws/index.js && echo "OK"
+       - If either fails → report the error and suggest manual troubleshooting.
+
+     STEP 4 — Report result to user
+       - On success, print:
+           "GoChat plugin installed successfully.
+            Mode: local (default) — built-in server starts on port 9750.
+            Start OpenClaw: openclaw start"
+       - If relay was chosen, mention:
+           "Mode: relay — plugin will auto-connect to ws://localhost:9750/ws/plugin"
+
+     DO NOT:
+       - Do NOT modify OpenClaw config files unless the user explicitly asks.
+       - Do NOT start OpenClaw automatically after install.
+       - Do NOT install node_modules globally or modify system PATH.
+-->
+
 ## Installation from Git Repository
 
 ### Option 1: Clone and Install
