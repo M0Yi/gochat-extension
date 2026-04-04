@@ -10,12 +10,16 @@ VERSION="2026.3.28"
 EXTENSION_NAME="gochat"
 PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
+REPO_URL="https://github.com/M0Yi/gochat-extension.git"
 
 # ──────────────────────────────────────────────
-# Globals (declared upfront for set -u safety)
+# Globals (ALL declared upfront for set -u)
 # ──────────────────────────────────────────────
+PLATFORM=""
+ARCH=""
 OPENCLAW_BIN=""
 TARBALL_PATH=""
+PIPED_INSTALL=false
 
 # ──────────────────────────────────────────────
 # Colors
@@ -77,15 +81,15 @@ detect_os() {
 check_os_support() {
   case "${PLATFORM}" in
     linux|linux-wsl|macos)
-      info "Platform: ${PLATFORM} (${ARCH}) — supported"
+      info "Platform: ${PLATFORM} (${ARCH})"
       return 0
       ;;
     bsd)
-      warn "Platform: ${PLATFORM} (${ARCH}) — unofficial, best-effort support"
+      warn "Platform: ${PLATFORM} (${ARCH}) — unofficial, best-effort"
       return 0
       ;;
     windows)
-      fail "Native Windows is not supported. Use WSL (Windows Subsystem for Linux)."
+      fail "Native Windows is not supported. Use WSL."
       fail "  wsl --install"
       exit 1
       ;;
@@ -101,14 +105,12 @@ check_os_support() {
 # ──────────────────────────────────────────────
 
 detect_openclaw() {
-  # Check if openclaw CLI is available
   if command -v openclaw &>/dev/null; then
     OPENCLAW_BIN="$(command -v openclaw)"
     info "Found OpenClaw at: ${OPENCLAW_BIN}"
     return 0
   fi
 
-  # Check common install locations per platform
   local paths=()
 
   case "${PLATFORM}" in
@@ -137,7 +139,6 @@ detect_openclaw() {
       ;;
   esac
 
-  # Add npm global prefix if npm is available
   if command -v npm &>/dev/null; then
     local npm_prefix
     npm_prefix="$(npm config get prefix 2>/dev/null || true)"
@@ -158,14 +159,12 @@ detect_openclaw() {
 }
 
 get_openclaw_dir() {
-  # Use OPENCLAW_STATE_DIR if set (safe under set -u)
   local state_dir="${OPENCLAW_STATE_DIR:-}"
   if [ -n "${state_dir}" ]; then
     echo "${state_dir}"
     return
   fi
 
-  # XDG-compliant location on Linux
   if [ "${PLATFORM}" = "linux" ] || [ "${PLATFORM}" = "linux-wsl" ]; then
     local xdg_dir="${XDG_DATA_HOME:-${HOME}/.local/share}"
     if [ -d "${xdg_dir}/openclaw" ]; then
@@ -174,7 +173,6 @@ get_openclaw_dir() {
     fi
   fi
 
-  # Default location
   echo "${HOME}/.openclaw"
 }
 
@@ -185,29 +183,51 @@ get_extensions_dir() {
 }
 
 # ──────────────────────────────────────────────
+# Ensure directory is writable
+# ──────────────────────────────────────────────
+
+ensure_dir_writable() {
+  local target_dir="$1"
+  local parent_dir
+  parent_dir="$(dirname "${target_dir}")"
+
+  if [ -d "${target_dir}" ] && [ ! -w "${target_dir}" ]; then
+    fail "Directory not writable: ${target_dir}"
+    fail "Try: sudo mkdir -p ${target_dir} && sudo chown \$(whoami) ${target_dir}"
+    exit 1
+  fi
+
+  if [ ! -d "${target_dir}" ]; then
+    if [ ! -w "${parent_dir}" ]; then
+      fail "Cannot create directory: ${target_dir}"
+      fail "Parent not writable: ${parent_dir}"
+      fail "Try: sudo mkdir -p ${target_dir} && sudo chown -R \$(whoami) ${parent_dir}"
+      exit 1
+    fi
+  fi
+
+  mkdir -p "${target_dir}"
+}
+
+# ──────────────────────────────────────────────
 # Install functions
 # ──────────────────────────────────────────────
 
 install_from_tarball() {
   local tarball="$1"
   local extensions_dir
-
   extensions_dir="$(get_extensions_dir)"
 
-  # Create extensions directory if needed
-  mkdir -p "${extensions_dir}"
+  ensure_dir_writable "${extensions_dir}"
 
-  # Remove old installation if exists
   if [ -d "${extensions_dir}/${EXTENSION_NAME}" ]; then
     info "Removing previous installation..."
     rm -rf "${extensions_dir}/${EXTENSION_NAME}"
   fi
 
-  # Extract
   info "Extracting to ${extensions_dir}/${EXTENSION_NAME}..."
   tar -xzf "${tarball}" -C "${extensions_dir}"
 
-  # Install npm dependencies
   if [ -f "${extensions_dir}/${EXTENSION_NAME}/package.json" ]; then
     info "Installing npm dependencies..."
     (cd "${extensions_dir}/${EXTENSION_NAME}" && npm install --production 2>&1) || {
@@ -215,36 +235,27 @@ install_from_tarball() {
     }
   fi
 
-  ok "Extension files installed to ${extensions_dir}/${EXTENSION_NAME}"
+  ok "Installed to ${extensions_dir}/${EXTENSION_NAME}"
 }
 
 install_from_source() {
-  local script_dir
-  script_dir="$(cd "$(dirname "$0")" && pwd)"
-
+  local source_dir="$1"
   local extensions_dir
   extensions_dir="$(get_extensions_dir)"
 
-  # Create extensions directory if needed
-  mkdir -p "${extensions_dir}"
+  ensure_dir_writable "${extensions_dir}"
 
-  # Remove old installation if exists
   if [ -d "${extensions_dir}/${EXTENSION_NAME}" ]; then
     info "Removing previous installation..."
     rm -rf "${extensions_dir}/${EXTENSION_NAME}"
   fi
 
-  # Copy source files
-  info "Copying extension files to ${extensions_dir}/${EXTENSION_NAME}..."
-  cp -r "${script_dir}" "${extensions_dir}/${EXTENSION_NAME}"
+  info "Copying to ${extensions_dir}/${EXTENSION_NAME}..."
+  cp -r "${source_dir}" "${extensions_dir}/${EXTENSION_NAME}"
 
-  # Remove node_modules from copy if present
   rm -rf "${extensions_dir}/${EXTENSION_NAME}/node_modules"
-
-  # Remove .git directory from copy if present
   rm -rf "${extensions_dir}/${EXTENSION_NAME}/.git"
 
-  # Install npm dependencies
   if [ -f "${extensions_dir}/${EXTENSION_NAME}/package.json" ]; then
     info "Installing npm dependencies..."
     (cd "${extensions_dir}/${EXTENSION_NAME}" && npm install --production 2>&1) || {
@@ -252,7 +263,32 @@ install_from_source() {
     }
   fi
 
-  ok "Extension files installed to ${extensions_dir}/${EXTENSION_NAME}"
+  ok "Installed to ${extensions_dir}/${EXTENSION_NAME}"
+}
+
+install_piped() {
+  local tmp_dir
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/gochat-install.XXXXXX")"
+
+  info "Pipe install detected — cloning from ${REPO_URL}..."
+  if command -v git &>/dev/null; then
+    git clone --depth 1 "${REPO_URL}" "${tmp_dir}/gochat-extension" 2>&1 || {
+      fail "git clone failed. Check network or install git."
+      rm -rf "${tmp_dir}"
+      exit 1
+    }
+    install_from_source "${tmp_dir}/gochat-extension"
+    rm -rf "${tmp_dir}"
+  else
+    fail "Pipe install requires git but git is not installed."
+    fail "Install git first:"
+    case "${PLATFORM}" in
+      macos)     fail "  brew install git" ;;
+      linux|linux-wsl) fail "  sudo apt install git  OR  sudo dnf install git" ;;
+    esac
+    rm -rf "${tmp_dir}"
+    exit 1
+  fi
 }
 
 # ──────────────────────────────────────────────
@@ -300,21 +336,14 @@ main() {
   printf "─────────────────────────────────────${NC}\n"
   echo ""
 
-  # ── OS & Architecture Detection ──
   detect_os
   check_os_support
 
-  # ── Check prerequisites ──
   if ! command -v node &>/dev/null; then
     fail "Node.js is required but not found."
     case "${PLATFORM}" in
-      macos)
-        info "Install with: brew install node"
-        ;;
-      linux|linux-wsl)
-        info "Install with: sudo apt install nodejs  OR  sudo dnf install nodejs"
-        info "Or use nvm:   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
-        ;;
+      macos)          info "Install: brew install node" ;;
+      linux|linux-wsl) info "Install: sudo apt install nodejs  OR  use nvm" ;;
     esac
     exit 1
   fi
@@ -322,12 +351,8 @@ main() {
   if ! command -v npm &>/dev/null; then
     fail "npm is required but not found."
     case "${PLATFORM}" in
-      macos)
-        info "Install with: brew install node"
-        ;;
-      linux|linux-wsl)
-        info "Install with: sudo apt install npm  OR  sudo dnf install npm"
-        ;;
+      macos)          info "Install: brew install node" ;;
+      linux|linux-wsl) info "Install: sudo apt install npm" ;;
     esac
     exit 1
   fi
@@ -341,91 +366,68 @@ main() {
     oc_version="$("${OPENCLAW_BIN}" --version 2>/dev/null | head -1 || echo "unknown")"
     info "OpenClaw version: ${oc_version}"
   else
-    warn "OpenClaw CLI not found in PATH."
-    warn "The extension will be installed but may not work until OpenClaw is installed."
-    case "${PLATFORM}" in
-      macos)
-        warn "Install OpenClaw: brew install openclaw"
-        ;;
-      linux|linux-wsl)
-        warn "Install OpenClaw: curl -sL https://get.openclaw.dev | bash"
-        ;;
-    esac
+    warn "OpenClaw CLI not found. Extension will install but won't work until OpenClaw is installed."
   fi
 
-  # ── Parse arguments ──
   local MODE="local"
   local SOURCE=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
-      --relay|-r)
-        MODE="relay"
-        shift
-        ;;
-      --local|-l)
-        MODE="local"
-        shift
-        ;;
+      --relay|-r)   MODE="relay"; shift ;;
+      --local|-l)   MODE="local"; shift ;;
       --mode)
-        if [ $# -lt 2 ]; then
-          fail "--mode requires an argument (local or relay)"
-          exit 1
-        fi
-        MODE="$2"
-        shift 2
+        [ $# -lt 2 ] && { fail "--mode requires an argument"; exit 1; }
+        MODE="$2"; shift 2
         ;;
       --from-tarball)
-        if [ $# -lt 2 ]; then
-          fail "--from-tarball requires a file path argument"
-          exit 1
-        fi
-        SOURCE="tarball"
-        TARBALL_PATH="$2"
-        shift 2
+        [ $# -lt 2 ] && { fail "--from-tarball requires a path"; exit 1; }
+        SOURCE="tarball"; TARBALL_PATH="$2"; shift 2
         ;;
       --help|-h)
         echo "Usage: $0 [OPTIONS]"
         echo ""
         echo "Options:"
-        echo "  --local, -l            Local mode (default): built-in HTTP server"
-        echo "  --relay, -r            Relay mode: WebSocket relay via GoChat platform"
+        echo "  --local, -l            Local mode (default)"
+        echo "  --relay, -r            Relay mode"
         echo "  --mode <mode>          Set mode: local or relay"
-        echo "  --from-tarball <path>  Install from a .tar.gz file"
+        echo "  --from-tarball <path>  Install from .tar.gz"
         echo "  --help, -h             Show this help"
         echo ""
-        echo "Examples:"
-        echo "  $0                          # Install with local mode"
-        echo "  $0 --relay                  # Install with relay mode"
-        echo "  $0 --from-tarball ./pkg.tar.gz  # Install from tarball"
-        echo "  curl -sL <url>/install.sh | bash          # One-command install (local)"
-        echo "  curl -sL <url>/install.sh | bash -s -- --relay  # One-command install (relay)"
-        echo ""
+        echo "Pipe install:"
+        echo "  curl -sL <url>/install.sh | bash"
+        echo "  curl -sL <url>/install.sh | bash -s -- --relay"
         exit 0
         ;;
-      *)
-        warn "Unknown option: $1"
-        echo "Use --help for usage information."
-        exit 1
-        ;;
+      *) warn "Unknown option: $1"; exit 1 ;;
     esac
   done
 
-  # ── Perform installation ──
   if [ "${SOURCE}" = "tarball" ]; then
-    if [ ! -f "${TARBALL_PATH}" ]; then
-      fail "Tarball not found: ${TARBALL_PATH}"
-      exit 1
-    fi
+    [ ! -f "${TARBALL_PATH}" ] && { fail "Tarball not found: ${TARBALL_PATH}"; exit 1; }
     install_from_tarball "${TARBALL_PATH}"
+  elif [ "${PIPED_INSTALL}" = "true" ]; then
+    install_piped
   else
-    install_from_source
+    local script_dir
+    script_dir="$(cd "$(dirname "$0")" && pwd)"
+    if [ ! -f "${script_dir}/package.json" ]; then
+      warn "Not running from source directory. Falling back to git clone..."
+      PIPED_INSTALL=true
+      install_piped
+    else
+      install_from_source "${script_dir}"
+    fi
   fi
 
-  # ── Configure ──
   configure_gochat "${MODE}"
 
-  printf "${GREEN}${BOLD}✓ GoChat extension installed successfully!${NC}\n"
+  printf "${GREEN}${BOLD}GoChat extension installed successfully!${NC}\n"
 }
+
+# Detect pipe install: stdin is not a terminal
+if [ ! -t 0 ]; then
+  PIPED_INSTALL=true
+fi
 
 main "$@"
