@@ -20,8 +20,8 @@ export type GoChatMode = "local" | "relay";
 
 export const DEFAULT_LOCAL_PORT = 9750;
 export const DEFAULT_LOCAL_HOST = "0.0.0.0";
-export const DEFAULT_RELAY_WS_URL = "ws://localhost:9750/ws/plugin";
-export const DEFAULT_RELAY_HTTP_URL = "http://localhost:9750";
+export const DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin";
+export const DEFAULT_RELAY_HTTP_URL = "https://fund.moyi.vip";
 
 export type GoChatAccountConfig = {
   name?: string;

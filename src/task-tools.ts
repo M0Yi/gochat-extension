@@ -21,11 +21,9 @@ type GoChatTask = {
 function resolveGoBackendBaseUrl(cfg: CoreConfig): string {
   const account = resolveGoChatAccount({ cfg });
   if (account.mode === "relay") {
-    return account.relayPlatformUrl.replace(/^ws/, "http").replace(/\/ws\/plugin$/, "");
+    return account.relayPlatformUrl.replace(/^wss?/, "https").replace(/\/ws\/plugin$/, "");
   }
   return `http://localhost:${account.directPort}`;
-}
-  return DEFAULT_RELAY_HTTP_URL;
 }
 
 function signGoChatRequest(

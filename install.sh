@@ -310,7 +310,7 @@ configure_gochat() {
     info "  server:        built-in HTTP API on port 9750"
     info "  secret:        auto-generated"
   else
-    info "  server:        WebSocket relay to ws://localhost:9750/ws/plugin"
+    info "  server:        WebSocket relay to wss://fund.moyi.vip/ws/plugin"
     info "  channelId:     auto-registered on first start"
   fi
   info "  dmPolicy:      open (anyone can chat)"

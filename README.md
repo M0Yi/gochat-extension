@@ -3,7 +3,7 @@
 A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables custom chat backend integration via HTTP webhook. Supports **two operation modes**:
 
 - **Local mode** — Zero-config built-in HTTP API server on port 9750
-- **Relay mode** — WebSocket relay connection to the GoChat platform
+- **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://fund.moyi.vip/ws/plugin`
 
 ## Features
 
@@ -158,7 +158,7 @@ Relay mode connects to the GoChat platform WebSocket relay.
 channels:
   gochat:
     mode: relay
-    relayPlatformUrl: ws://your-relay-server:9750/ws/plugin
+    relayPlatformUrl: wss://fund.moyi.vip/ws/plugin
 ```
 
 ### Configuration File
