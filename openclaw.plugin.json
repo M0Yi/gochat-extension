@@ -1,0 +1,49 @@
+{
+  "id": "gochat",
+  "kind": "channel",
+  "channels": ["gochat"],
+  "name": "GoChat",
+  "description": "Custom chat backend. Local mode (built-in API, zero config) or relay mode (GoChat platform via WebSocket). Supports text, images, audio, video, and file attachments.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "gochat": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["local", "relay"],
+            "description": "local: built-in API server, zero config (default); relay: WebSocket relay via GoChat platform"
+          },
+          "webhookSecret": {
+            "type": "string",
+            "description": "Webhook signing secret (auto-generated for local mode)"
+          },
+          "allowFrom": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "DM allowlist (sender IDs)"
+          },
+          "dmPolicy": {
+            "type": "string",
+            "enum": ["pairing", "allowlist", "open", "disabled"],
+            "description": "DM access policy (default: open)"
+          },
+          "directPort": {
+            "type": "number",
+            "description": "Port for local mode HTTP server (default: 9750)"
+          },
+          "relayPlatformUrl": {
+            "type": "string",
+            "description": "GoChat relay platform WebSocket URL (auto-configured)"
+          },
+          "channelId": {
+            "type": "string",
+            "description": "Channel ID from GoChat relay platform (auto-registered)"
+          }
+        }
+      }
+    }
+  }
+}
