@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 
+import type { WebSocket as WS } from "ws";
+
 export interface RelayWSOptions {
   platformUrl: string;
   channelId: string;
@@ -9,10 +11,11 @@ export interface RelayWSOptions {
   abortSignal?: AbortSignal;
 }
 
-type WSInstance = InstanceType<typeof import("ws")>;
+type WSInstance = InstanceType<typeof WS>;
 
 const MAX_BACKOFF_MS = 30_000;
 const INITIAL_BACKOFF_MS = 1_000;
+const PING_INTERVAL_MS = 30_000;
 
 function computeHmacSignature(secret: string, channelId: string, ts: number): string {
   const payload = `${ts}.${channelId}`;
@@ -30,6 +33,7 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
   let stopped = false;
   let backoffMs = INITIAL_BACKOFF_MS;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let pingTimer: ReturnType<typeof setTimeout> | null = null;
 
   function log(level: "info" | "warn" | "error", msg: string): void {
     const prefix = `[gochat:relay:${channelId}]`;
@@ -42,13 +46,21 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
     }
   }
 
-  function stop(): void {
-    if (stopped) return;
-    stopped = true;
+  function cleanup(): void {
+    if (pingTimer) {
+      clearInterval(pingTimer);
+      pingTimer = null;
+    }
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+  }
+
+  function stop(): void {
+    if (stopped) return;
+    stopped = true;
+    cleanup();
     if (ws) {
       try {
         ws.close(1000, "shutdown");
@@ -60,7 +72,7 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
   }
 
   function send(data: any): void {
-    if (!ws || ws.readyState !== 1) {
+    if (!ws || ws.readyState !== ws.OPEN) {
       log("warn", "send called but WebSocket not open");
       return;
     }
@@ -125,6 +137,7 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
 
       socket.on("close", (code: number, reason: Buffer) => {
         ws = null;
+        cleanup();
         if (stopped || abortSignal?.aborted) return;
         log("warn", `WebSocket closed (code=${code}), reconnecting in ${backoffMs}ms`);
         reconnectTimer = setTimeout(() => {
@@ -158,6 +171,23 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
     }
 
     await doConnect();
+
+    pingTimer = setInterval(() => {
+      if (stopped || abortSignal?.aborted) {
+        clearInterval(pingTimer);
+        pingTimer = null;
+        return;
+      }
+      if (!ws || ws.readyState !== ws.OPEN) {
+        log("warn", "ping skipped — WebSocket not open");
+        return;
+      }
+      try {
+        ws.send(JSON.stringify({ type: "ping" }));
+      } catch (err) {
+        log("warn", `ping failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }, PING_INTERVAL_MS);
   }
 
   return { start, send, stop };
