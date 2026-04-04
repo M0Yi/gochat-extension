@@ -59,11 +59,11 @@ export function listGoChatAccountIds(cfg: CoreConfig): string[] {
 }
 
 function normalizeGoChatMode(raw: string | undefined): GoChatMode {
-  if (!raw) return "local";
+  if (!raw) return "relay";
   const lower = raw.toLowerCase().trim();
   if (lower === "local" || lower === "direct") return "local";
   if (lower === "relay" || lower === "relay-ws") return "relay";
-  return "local";
+  return "relay";
 }
 
 function mergeGoChatAccountConfig(

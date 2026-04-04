@@ -14,7 +14,7 @@
           "mode": {
             "type": "string",
             "enum": ["local", "relay"],
-            "description": "local: built-in API server, zero config (default); relay: WebSocket relay via GoChat platform"
+            "description": "local: built-in API server; relay: WebSocket relay via GoChat platform (default)"
           },
           "webhookSecret": {
             "type": "string",
