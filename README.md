@@ -71,7 +71,7 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
        - On success, print:
            "GoChat plugin installed successfully.
             Mode: local (default) — built-in server starts on port 9750.
-            Start OpenClaw: openclaw start"
+            Start OpenClaw: openclaw gateway run"
        - If relay was chosen, mention:
            "Mode: relay — plugin will auto-connect to ws://localhost:9750/ws/plugin"
 
@@ -139,10 +139,10 @@ Local mode requires no configuration — the plugin auto-starts an HTTP server o
 
 ```bash
 # After installation, start OpenClaw
-openclaw start
+openclaw gateway run
 
-# Or run interactive setup
-openclaw gochat setup
+# Check plugin status
+openclaw plugins list
 ```
 
 ### Relay Mode Setup
@@ -211,21 +211,17 @@ channels:
 ### Starting OpenClaw
 
 ```bash
-# Start with GoChat plugin
-openclaw start
+# Start gateway in foreground
+openclaw gateway run
+
+# Or start gateway as background service
+openclaw gateway start
 
 # Check plugin status
-openclaw status
+openclaw plugins list
 
-# View logs
-openclaw logs -f gochat
-```
-
-### Interactive Setup
-
-```bash
-# Run GoChat setup wizard
-openclaw gochat setup
+# Check channel status
+openclaw channels list
 ```
 
 ### Sending Messages

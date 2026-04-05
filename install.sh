@@ -317,11 +317,13 @@ configure_gochat() {
   info "──────────────────────────"
 
   echo ""
-  ok "GoChat is ready! Start OpenClaw and the GoChat channel will activate automatically."
+  ok "GoChat is ready! Start the gateway and GoChat channel will activate automatically."
   echo ""
   info "Usage:"
-  info "  openclaw start          # Start OpenClaw with GoChat enabled"
-  info "  openclaw gochat setup   # Interactive setup wizard"
+  info "  openclaw gateway run    # Start gateway in foreground"
+  info "  openclaw gateway start   # Start gateway as background service"
+  info "  openclaw channels list  # Check channel status"
+  info "  openclaw plugins list   # Check installed plugins"
   echo ""
 }
 
