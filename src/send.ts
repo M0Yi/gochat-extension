@@ -80,15 +80,76 @@ async function sendDirect(
   };
 }
 
+async function uploadToGoChatServer(
+  mediaUrl: string,
+  relayPlatformUrl: string,
+): Promise<string> {
+  try {
+    const response = await fetch(mediaUrl);
+    if (!response.ok) {
+      console.warn(`[gochat:relay] failed to fetch media from ${mediaUrl}: ${response.status}`);
+      return mediaUrl;
+    }
+    const blob = await response.blob();
+    const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+    const filename = mediaUrl.split("/").pop() || "attachment";
+
+    const baseUrl = relayPlatformUrl.replace("wss://", "https://").replace("ws://", "http://").replace("/ws/plugin", "");
+
+    const presignRes = await fetch(`${baseUrl}/api/upload/presign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, contentType }),
+    });
+    if (!presignRes.ok) {
+      console.warn(`[gochat:relay] presign failed: ${presignRes.status}`);
+      return mediaUrl;
+    }
+    const presign = await presignRes.json() as { uploadUrl: string; fileKey: string };
+
+    const uploadRes = await fetch(presign.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: blob,
+    });
+    if (!uploadRes.ok) {
+      console.warn(`[gochat:relay] upload failed: ${uploadRes.status}`);
+      return mediaUrl;
+    }
+
+    const confirmRes = await fetch(`${baseUrl}/api/upload/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileKey: presign.fileKey }),
+    });
+    if (!confirmRes.ok) {
+      console.warn(`[gochat:relay] confirm failed: ${confirmRes.status}`);
+      return mediaUrl;
+    }
+    const confirm = await confirmRes.json() as { url: string };
+    console.log(`[gochat:relay] reuploaded media: ${mediaUrl} -> ${confirm.url}`);
+    return confirm.url;
+  } catch (err) {
+    console.warn(`[gochat:relay] upload to gochat-server failed: ${err instanceof Error ? err.message : String(err)}`);
+    return mediaUrl;
+  }
+}
+
 async function sendRelay(
   conversationId: string,
   text: string,
   opts: GoChatSendOpts,
   accountId: string,
+  relayPlatformUrl: string,
 ): Promise<GoChatSendResult> {
   if (!relayWsSender) {
     console.error(`[gochat:relay] Cannot send reply — relayWsSender is null (relay not connected)`);
     throw new Error("GoChat relay not connected");
+  }
+
+  let finalMediaUrl = opts.mediaUrl;
+  if (opts.mediaUrl) {
+    finalMediaUrl = await uploadToGoChatServer(opts.mediaUrl, relayPlatformUrl);
   }
 
   const payload: Record<string, unknown> = {
@@ -100,10 +161,11 @@ async function sendRelay(
   if (opts.replyTo) {
     payload.replyTo = opts.replyTo;
   }
-  if (opts.mediaUrl) {
-    payload.mediaUrl = opts.mediaUrl;
+  if (finalMediaUrl) {
+    payload.mediaUrl = finalMediaUrl;
   }
-  console.log(`[gochat:relay] Sending reply to conv=${conversationId} text="${text.substring(0, 80)}..."`);
+  const mediaLabel = finalMediaUrl ? ` mediaUrl="${finalMediaUrl.substring(0, 120)}..."` : '';
+  console.log(`[gochat:relay] Sending reply to conv=${conversationId} text="${text.substring(0, 80)}..."${mediaLabel}`);
   relayWsSender(payload);
 
   const messageId = `ws-${Date.now()}`;
@@ -140,5 +202,5 @@ export async function sendMessageGoChat(
     return await sendDirect(conversationId, message, opts, account.accountId);
   }
 
-  return await sendRelay(conversationId, message, opts, account.accountId);
+  return await sendRelay(conversationId, message, opts, account.accountId, account.relayPlatformUrl);
 }
