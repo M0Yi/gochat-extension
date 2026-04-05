@@ -126,13 +126,18 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
           const parsed = JSON.parse(text);
 
           if (parsed.type === "message") {
+            log("info", `recv message: conv=${parsed.conversationId || "default"} text="${(parsed.text || "").substring(0, 60)}..."`);
             try {
               await onMessage(parsed);
             } catch (err) {
               onError?.(err instanceof Error ? err : new Error(String(err)));
             }
+          } else if (parsed.type === "reply") {
+            log("info", `recv reply: conv=${parsed.conversationId || "default"} text="${(parsed.text || "").substring(0, 60)}..."`);
           } else if (parsed.type === "pong") {
             // heartbeat acknowledged
+          } else if (parsed.type === "error") {
+            log("error", `server error: ${parsed.text || parsed.error || JSON.stringify(parsed)}`);
           }
         } catch (err) {
           log("warn", `failed to parse incoming message: ${err instanceof Error ? err.message : String(err)}`);
