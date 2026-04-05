@@ -148,7 +148,8 @@ export async function handleGoChatInbound(params: {
   });
 
   const rawBody = message.text?.trim() ?? "";
-  const hasAttachments = message.attachments.length > 0;
+  const attachments = message.attachments ?? [];
+  const hasAttachments = attachments.length > 0;
   if (!rawBody && !hasAttachments) {
     return;
   }
