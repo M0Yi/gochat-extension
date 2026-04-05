@@ -61,6 +61,7 @@ export async function monitorGoChatProvider(
   });
 
   const startedAt = Date.now();
+  let isWorking = false;
 
   const { start: startRelay, stop: stopRelay, send: sendRelay } = createRelayWSConnection({
     platformUrl: account.relayPlatformUrl,
@@ -77,13 +78,18 @@ export async function monitorGoChatProvider(
         await opts.onMessage(message);
         return;
       }
-      await handleGoChatInbound({
-        message,
-        account,
-        config: cfg,
-        runtime,
-        statusSink: opts.statusSink,
-      });
+      isWorking = true;
+      try {
+        await handleGoChatInbound({
+          message,
+          account,
+          config: cfg,
+          runtime,
+          statusSink: opts.statusSink,
+        });
+      } finally {
+        isWorking = false;
+      }
     },
     onError: (error) => {
       logger.error(`[gochat:${account.accountId}] relay error: ${error.message}`);
@@ -94,7 +100,7 @@ export async function monitorGoChatProvider(
       return {
         version: getPluginVersion(),
         agentCount: accountIds.length,
-        status: "idle",
+        status: isWorking ? "working" : "idle",
         uptime: Math.floor((Date.now() - startedAt) / 1000),
       };
     },
