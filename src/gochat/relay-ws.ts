@@ -82,11 +82,14 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
 
   function send(data: any): void {
     if (!ws || ws.readyState !== ws.OPEN) {
-      log("warn", "send called but WebSocket not open");
+      log("warn", `send called but WebSocket not open (readyState=${ws?.readyState}), dropping: type=${typeof data === "object" ? data?.type : "unknown"}`);
       return;
     }
     try {
-      ws.send(typeof data === "string" ? data : JSON.stringify(data));
+      const payload = typeof data === "string" ? data : JSON.stringify(data);
+      ws.send(payload);
+      const dataType = typeof data === "object" ? data?.type : "unknown";
+      log("info", `sent to server: type=${dataType} conv=${typeof data === "object" ? data?.conversationId : "?"} text="${(typeof data === "object" ? data?.text : "").substring(0, 80)}"`);
     } catch (err) {
       log("error", `send failed: ${err instanceof Error ? err.message : String(err)}`);
     }

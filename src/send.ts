@@ -87,6 +87,7 @@ async function sendRelay(
   accountId: string,
 ): Promise<GoChatSendResult> {
   if (!relayWsSender) {
+    console.error(`[gochat:relay] Cannot send reply — relayWsSender is null (relay not connected)`);
     throw new Error("GoChat relay not connected");
   }
 
@@ -102,6 +103,7 @@ async function sendRelay(
   if (opts.mediaUrl) {
     payload.mediaUrl = opts.mediaUrl;
   }
+  console.log(`[gochat:relay] Sending reply to conv=${conversationId} text="${text.substring(0, 80)}..."`);
   relayWsSender(payload);
 
   const messageId = `ws-${Date.now()}`;
