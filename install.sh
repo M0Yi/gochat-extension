@@ -11,6 +11,8 @@ EXTENSION_NAME="gochat"
 PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
+RELAY_HTTP_URL="https://fund.moyi.vip"
+RELAY_WS_URL="wss://fund.moyi.vip/ws/plugin"
 
 # ──────────────────────────────────────────────
 # Globals (ALL declared upfront for set -u)
@@ -308,27 +310,123 @@ configure_gochat() {
   info "  mode:          ${mode}"
   info "  extension dir: ${extensions_dir}/${EXTENSION_NAME}"
 
-  if [ "${mode}" = "local" ]; then
-    info "  server:        built-in HTTP API on port 9750"
-    info "  secret:        auto-generated"
+  if [ "${mode}" = "relay" ]; then
+    info "  relay:         ${RELAY_WS_URL}"
+    info "  dmPolicy:      open (skip pairing)"
+    info "──────────────────────────"
+    echo ""
+    register_relay
   else
-    info "  server:        WebSocket relay to wss://fund.moyi.vip/ws/plugin"
-    info "  channelId:     auto-registered on first start"
+    info "  server:        built-in HTTP API on port 9750"
+    info "  dmPolicy:      open"
+    info "──────────────────────────"
   fi
-  info "  dmPolicy:      open (anyone can chat)"
-  info "──────────────────────────"
 
   echo ""
-  ok "GoChat is ready! Start the gateway and GoChat channel will activate automatically."
+  ok "GoChat is ready!"
   echo ""
   info "Usage:"
-  info "  openclaw gateway run    # Start gateway in foreground"
-  info "  openclaw gateway start   # Start gateway as background service"
-  info "  openclaw channels list  # Check channel status"
-  info "  openclaw plugins list   # Check installed plugins"
+  info "  openclaw gateway run     # Start gateway"
+  info "  openclaw channels list   # Check channel status"
+  info "  openclaw gochat show-credentials  # View credentials"
   echo ""
+}
+
+register_relay() {
+  local openclaw_dir
+  openclaw_dir="$(get_openclaw_dir)"
+  local config_file="${openclaw_dir}/openclaw.json"
+
+  if [ ! -f "${config_file}" ]; then
+    warn "Config not found (${config_file}). Will register on first gateway start."
+    return 0
+  fi
+
+  local existing_id
+  existing_id="$(node -e "
+    try {
+      const c = JSON.parse(require('fs').readFileSync('${config_file}','utf8'));
+      const g = c.channels && c.channels.gochat;
+      if (g && g.channelId) process.stdout.write(g.channelId);
+    } catch {}
+  " 2>/dev/null || true)"
+
+  if [ -n "${existing_id}" ]; then
+    info "Existing channelId: ${existing_id} — skipping registration."
+    ensure_dm_policy_open "${config_file}"
+    print_credentials
+    return 0
+  fi
+
+  info "Registering with relay platform..."
+  local reg_response
+  reg_response="$(curl -sf -X POST "${RELAY_HTTP_URL}/api/plugin/register" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"OpenClaw GoChat Plugin"}' \
+    --connect-timeout 10 \
+    --max-time 15 2>/dev/null || true)"
+
+  if [ -z "${reg_response}" ]; then
+    warn "Registration failed (network error). Will auto-register on first gateway start."
+    return 0
+  fi
+
+  local reg_channel_id=""
+  local reg_secret=""
+  reg_channel_id="$(echo "${reg_response}" | node -e "
+    try {
+      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+      if (d.channelId) process.stdout.write(d.channelId);
+    } catch {}
+  " 2>/dev/null || true)"
+  reg_secret="$(echo "${reg_response}" | node -e "
+    try {
+      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+      if (d.secret) process.stdout.write(d.secret);
+    } catch {}
+  " 2>/dev/null || true)"
+
+  if [ -z "${reg_channel_id}" ] || [ -z "${reg_secret}" ]; then
+    warn "Registration response missing channelId or secret."
+    return 0
+  fi
+
+  ok "Registered! channelId=${reg_channel_id}"
+
+  info "Writing config..."
+  node -e "
+    const fs = require('fs');
+    const c = JSON.parse(fs.readFileSync('${config_file}','utf8'));
+    if (!c.channels) c.channels = {};
+    c.channels.gochat = Object.assign(c.channels.gochat || {}, {
+      enabled: true,
+      mode: 'relay',
+      channelId: '${reg_channel_id}',
+      webhookSecret: '${reg_secret}',
+      relayPlatformUrl: '${RELAY_WS_URL}',
+      dmPolicy: 'open'
+    });
+    fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
+  " 2>/dev/null || {
+    warn "Failed to write config."
+    return 0
+  }
+  ok "Config saved."
 
   print_credentials
+}
+
+ensure_dm_policy_open() {
+  local config_file="$1"
+  node -e "
+    const fs = require('fs');
+    const c = JSON.parse(fs.readFileSync('${config_file}','utf8'));
+    const g = c.channels && c.channels.gochat;
+    if (g && g.dmPolicy !== 'open') {
+      g.dmPolicy = 'open';
+      fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
+    }
+  " 2>/dev/null || true
 }
 
 print_credentials() {
@@ -342,7 +440,6 @@ print_credentials() {
 
   local channel_id=""
   local secret=""
-  local relay_url=""
 
   if command -v node &>/dev/null; then
     channel_id="$(node -e "
@@ -358,14 +455,6 @@ print_credentials() {
         const c = JSON.parse(require('fs').readFileSync('${config_file}','utf8'));
         const g = c.channels && c.channels.gochat;
         if (g) process.stdout.write(g.webhookSecret || '');
-      } catch {}
-    " 2>/dev/null || true)"
-
-    relay_url="$(node -e "
-      try {
-        const c = JSON.parse(require('fs').readFileSync('${config_file}','utf8'));
-        const g = c.channels && c.channels.gochat;
-        if (g) process.stdout.write(g.relayPlatformUrl || '');
       } catch {}
     " 2>/dev/null || true)"
   fi
@@ -392,9 +481,7 @@ print_credentials() {
     printf "  Secret Key:    (pending — will be generated on first gateway start)\n"
   fi
 
-  if [ -n "${relay_url}" ]; then
-    printf "  Relay URL:     ${relay_url}\n"
-  fi
+  printf "  DM Policy:     open (no pairing approval needed)\n"
 
   echo ""
   printf "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
@@ -465,7 +552,7 @@ main() {
         echo ""
         echo "Options:"
         echo "  --local, -l            Local mode (default)"
-        echo "  --relay, -r            Relay mode"
+        echo "  --relay, -r            Relay mode (auto-register)"
         echo "  --mode <mode>          Set mode: local or relay"
         echo "  --from-tarball <path>  Install from .tar.gz"
         echo "  --help, -h             Show this help"
