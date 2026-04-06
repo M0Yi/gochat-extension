@@ -327,6 +327,78 @@ configure_gochat() {
   info "  openclaw channels list  # Check channel status"
   info "  openclaw plugins list   # Check installed plugins"
   echo ""
+
+  print_credentials
+}
+
+print_credentials() {
+  local openclaw_dir
+  openclaw_dir="$(get_openclaw_dir)"
+  local config_file="${openclaw_dir}/openclaw.json"
+
+  if [ ! -f "${config_file}" ]; then
+    return 0
+  fi
+
+  local channel_id=""
+  local secret=""
+  local relay_url=""
+
+  if command -v node &>/dev/null; then
+    channel_id="$(node -e "
+      try {
+        const c = JSON.parse(require('fs').readFileSync('${config_file}','utf8'));
+        const g = c.channels && c.channels.gochat;
+        if (g) process.stdout.write(g.channelId || '');
+      } catch {}
+    " 2>/dev/null || true)"
+
+    secret="$(node -e "
+      try {
+        const c = JSON.parse(require('fs').readFileSync('${config_file}','utf8'));
+        const g = c.channels && c.channels.gochat;
+        if (g) process.stdout.write(g.webhookSecret || '');
+      } catch {}
+    " 2>/dev/null || true)"
+
+    relay_url="$(node -e "
+      try {
+        const c = JSON.parse(require('fs').readFileSync('${config_file}','utf8'));
+        const g = c.channels && c.channels.gochat;
+        if (g) process.stdout.write(g.relayPlatformUrl || '');
+      } catch {}
+    " 2>/dev/null || true)"
+  fi
+
+  if [ -z "${channel_id}" ] && [ -z "${secret}" ]; then
+    return 0
+  fi
+
+  echo ""
+  printf "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+  printf "${CYAN}${BOLD}  GoChat Connection Credentials${NC}\n"
+  printf "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+  echo ""
+
+  if [ -n "${channel_id}" ]; then
+    printf "  Channel ID:    ${GREEN}${channel_id}${NC}\n"
+  else
+    printf "  Channel ID:    (pending — will be registered on first gateway start)\n"
+  fi
+
+  if [ -n "${secret}" ]; then
+    printf "  Secret Key:    ${GREEN}${secret}${NC}\n"
+  else
+    printf "  Secret Key:    (pending — will be generated on first gateway start)\n"
+  fi
+
+  if [ -n "${relay_url}" ]; then
+    printf "  Relay URL:     ${relay_url}\n"
+  fi
+
+  echo ""
+  printf "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+  echo ""
 }
 
 # ──────────────────────────────────────────────
