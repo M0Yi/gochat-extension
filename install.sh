@@ -251,10 +251,12 @@ install_from_source() {
   fi
 
   info "Copying to ${extensions_dir}/${EXTENSION_NAME}..."
-  cp -r "${source_dir}" "${extensions_dir}/${EXTENSION_NAME}"
-
-  rm -rf "${extensions_dir}/${EXTENSION_NAME}/node_modules"
-  rm -rf "${extensions_dir}/${EXTENSION_NAME}/.git"
+  rsync -a --exclude='node_modules' --exclude='.git' "${source_dir}/" "${extensions_dir}/${EXTENSION_NAME}/" 2>/dev/null || {
+    # Fallback: copy then remove unwanted dirs
+    cp -r "${source_dir}" "${extensions_dir}/${EXTENSION_NAME}"
+    rm -rf "${extensions_dir}/${EXTENSION_NAME}/node_modules"
+    rm -rf "${extensions_dir}/${EXTENSION_NAME}/.git"
+  }
 
   if [ -f "${extensions_dir}/${EXTENSION_NAME}/package.json" ]; then
     info "Installing npm dependencies..."
