@@ -27,13 +27,13 @@ A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables c
 ## Quick Install (Relay By Default)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/extensions/gochat/install.sh | bash
 ```
 
 Use a 6-digit connection code for zero-config pairing:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash -s -- 123456
+curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/extensions/gochat/install.sh | bash -s -- 123456
 ```
 
 ---
@@ -55,7 +55,7 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
        - Determine OpenClaw state dir: echo $OPENCLAW_STATE_DIR (fallback: ~/.openclaw)
 
      STEP 2 — Download and install
-       - Run: curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
+       - Run: curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/extensions/gochat/install.sh | bash
        - If the user already has a 6-digit connection code, use: bash -s -- 123456
        - If install.sh fails → fall back to manual method:
            git clone https://github.com/M0Yi/gochat-extension.git /tmp/gochat-extension

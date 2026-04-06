@@ -20,6 +20,7 @@ $EXTENSION_NAME = "gochat"
 $PACKAGE_NAME = "@m0yi/gochat"
 $OPENCLAW_MIN_VERSION = "2026.3.28"
 $REPO_URL = "https://github.com/M0Yi/gochat-extension.git"
+$REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/extensions/gochat/install.ps1"
 $DEFAULT_RELAY_HTTP_URL = "https://fund.moyi.vip"
 $DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin"
 $RELAY_HTTP_URL = if ($env:GOCHAT_RELAY_HTTP_URL) { $env:GOCHAT_RELAY_HTTP_URL } else { $DEFAULT_RELAY_HTTP_URL }
@@ -249,6 +250,45 @@ function Install-FromGit {
 
     Install-FromSource $tmpDir
     Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+function Install-FromNpmPack {
+    $tmpDir = Join-Path $env:TEMP "gochat-pack-$(Get-Random)"
+    New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+
+    Write-Info "Downloading package from npm: $PACKAGE_NAME"
+    Push-Location $tmpDir
+    try {
+        $tarballName = (& npm pack $PACKAGE_NAME --silent 2>$null | Select-Object -Last 1).Trim()
+        if (-not $tarballName) {
+            throw "npm pack returned no tarball"
+        }
+
+        $tarballPath = Join-Path $tmpDir $tarballName
+        if (-not (Test-Path $tarballPath)) {
+            throw "tarball not found after npm pack: $tarballPath"
+        }
+
+        Install-FromTarball $tarballPath
+    } catch {
+        Write-Fail "npm package install failed. Check npm registry access."
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        exit 1
+    } finally {
+        Pop-Location
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Install-Remote {
+    $git = Get-Command "git" -ErrorAction SilentlyContinue
+    if ($git) {
+        Install-FromGit
+        return
+    }
+
+    Write-Warn "git not found. Falling back to npm package install..."
+    Install-FromNpmPack
 }
 
 # ──────────────────────────────────────────────
@@ -521,8 +561,8 @@ function Show-Help {
     Write-Host "  .\install.ps1 -FromTarball .\gochat-extension.tar.gz"
     Write-Host ""
     Write-Host "Remote install (run in PowerShell):"
-    Write-Host '  irm https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1 | iex'
-    Write-Host '  irm https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1 | iex -Args "123456"'
+    Write-Host "  & ([scriptblock]::Create((irm '$REMOTE_INSTALL_PS_URL')))"
+    Write-Host "  & ([scriptblock]::Create((irm '$REMOTE_INSTALL_PS_URL'))) -Code '123456'"
     Write-Host ""
 }
 
@@ -586,7 +626,7 @@ function Main {
         if ($scriptDir -and (Test-Path (Join-Path $scriptDir "package.json"))) {
             Install-FromSource $scriptDir
         } else {
-            Install-FromGit
+            Install-Remote
         }
     }
 

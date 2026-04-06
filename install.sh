@@ -288,8 +288,9 @@ install_piped() {
   local tmp_dir
   tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/gochat-install.XXXXXX")"
 
-  info "Pipe install detected — cloning from ${REPO_URL}..."
+  info "Pipe install detected..."
   if command -v git &>/dev/null; then
+    info "Cloning from ${REPO_URL}..."
     git clone --depth 1 "${REPO_URL}" "${tmp_dir}/gochat-extension" 2>&1 || {
       fail "git clone failed. Check network or install git."
       rm -rf "${tmp_dir}"
@@ -297,12 +298,33 @@ install_piped() {
     }
     install_from_source "${tmp_dir}/gochat-extension"
     rm -rf "${tmp_dir}"
+  elif command -v npm &>/dev/null; then
+    info "git not found. Falling back to npm package install..."
+    local pack_log
+    pack_log="${tmp_dir}/npm-pack.log"
+    (
+      cd "${tmp_dir}" &&
+      npm pack "${PACKAGE_NAME}" --silent
+    ) >"${pack_log}" 2>&1 || {
+      fail "npm package install failed. Check npm registry access."
+      rm -rf "${tmp_dir}"
+      exit 1
+    }
+    local tarball
+    tarball="$(tail -n 1 "${pack_log}")"
+    if [ -z "${tarball}" ] || [ ! -f "${tmp_dir}/${tarball}" ]; then
+      fail "npm pack did not produce a tarball."
+      rm -rf "${tmp_dir}"
+      exit 1
+    fi
+    install_from_tarball "${tmp_dir}/${tarball}"
+    rm -rf "${tmp_dir}"
   else
-    fail "Pipe install requires git but git is not installed."
-    fail "Install git first:"
+    fail "Pipe install requires git or npm, but neither is installed."
+    fail "Install one of them first:"
     case "${PLATFORM}" in
       macos)     fail "  brew install git" ;;
-      linux|linux-wsl) fail "  sudo apt install git  OR  sudo dnf install git" ;;
+      linux|linux-wsl) fail "  sudo apt install git  OR  sudo apt install npm" ;;
     esac
     rm -rf "${tmp_dir}"
     exit 1
