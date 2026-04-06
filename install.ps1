@@ -362,8 +362,12 @@ function Install-FromGit {
     }
 
     Write-Info "Cloning from $REPO_URL..."
-    & $GitBin clone --depth 1 $REPO_URL $tmpDir 2>&1 | ForEach-Object { Write-Verbose $_ }
-    if ($LASTEXITCODE -ne 0) {
+    $gitClone = Start-Process -FilePath $GitBin `
+        -ArgumentList @("clone", "--depth", "1", "--quiet", $REPO_URL, $tmpDir) `
+        -NoNewWindow `
+        -Wait `
+        -PassThru
+    if ($gitClone.ExitCode -ne 0) {
         Write-Fail "git clone failed. Check network connection."
         Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
         exit 1
