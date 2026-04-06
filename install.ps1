@@ -20,6 +20,7 @@ $EXTENSION_NAME = "gochat"
 $PACKAGE_NAME = "@m0yi/gochat"
 $OPENCLAW_MIN_VERSION = "2026.3.28"
 $REPO_URL = "https://github.com/M0Yi/gochat-extension.git"
+$REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/extensions/gochat/install.ps1"
 $DEFAULT_RELAY_HTTP_URL = "https://fund.moyi.vip"
 $DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin"
@@ -146,6 +147,122 @@ function Ensure-DirWritable {
 }
 
 # ──────────────────────────────────────────────
+# Git bootstrap
+# ──────────────────────────────────────────────
+
+function Refresh-SessionPath {
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $currentPath = $env:Path
+    $parts = @($currentPath, $machinePath, $userPath) | Where-Object { $_ }
+    if ($parts.Count -gt 0) {
+        $env:Path = (($parts -join ";").Split(";") | Where-Object { $_ } | Select-Object -Unique) -join ";"
+    }
+}
+
+function Get-GitCommandPath {
+    $git = Get-Command "git" -ErrorAction SilentlyContinue
+    if ($git) {
+        return $git.Source
+    }
+
+    $candidates = @(
+        "${env:ProgramFiles}\Git\cmd\git.exe",
+        "${env:ProgramFiles}\Git\bin\git.exe",
+        "${env:LocalAppData}\Programs\Git\cmd\git.exe",
+        "${env:LocalAppData}\Programs\Git\bin\git.exe",
+        "${env:ProgramData}\chocolatey\bin\git.exe",
+        "$env:USERPROFILE\scoop\shims\git.exe"
+    )
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Try-InstallGitWithWinget {
+    $winget = Get-Command "winget" -ErrorAction SilentlyContinue
+    if (-not $winget) {
+        return $false
+    }
+
+    Write-Info "Attempting to install git via winget..."
+    try {
+        & $winget.Source install --id Git.Git -e --source winget --scope user --silent --accept-package-agreements --accept-source-agreements
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Try-InstallGitWithScoop {
+    $scoop = Get-Command "scoop" -ErrorAction SilentlyContinue
+    if (-not $scoop) {
+        return $false
+    }
+
+    Write-Info "Attempting to install git via scoop..."
+    try {
+        & $scoop.Source install git
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Try-InstallGitWithChoco {
+    $choco = Get-Command "choco" -ErrorAction SilentlyContinue
+    if (-not $choco) {
+        return $false
+    }
+
+    Write-Info "Attempting to install git via Chocolatey..."
+    try {
+        & $choco.Source install git -y --no-progress
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Ensure-GitInstalled {
+    $gitPath = Get-GitCommandPath
+    if ($gitPath) {
+        return $gitPath
+    }
+
+    Write-Warn "git not found. Attempting automatic installation..."
+
+    $installed = $false
+    if (Try-InstallGitWithWinget) {
+        $installed = $true
+    } elseif (Try-InstallGitWithScoop) {
+        $installed = $true
+    } elseif (Try-InstallGitWithChoco) {
+        $installed = $true
+    }
+
+    Refresh-SessionPath
+    $gitPath = Get-GitCommandPath
+    if ($gitPath) {
+        Write-Ok "git installed successfully: $gitPath"
+        return $gitPath
+    }
+
+    if ($installed) {
+        Write-Warn "git installation finished, but git is not yet visible in this PowerShell session."
+    } else {
+        Write-Warn "Automatic git installation was unavailable."
+    }
+
+    return $null
+}
+
+# ──────────────────────────────────────────────
 # Install functions
 # ──────────────────────────────────────────────
 
@@ -231,17 +348,21 @@ function Install-FromSource {
 }
 
 function Install-FromGit {
+    param([string]$GitBin = "")
+
     $tmpDir = Join-Path $env:TEMP "gochat-install-$(Get-Random)"
 
-    Write-Info "Cloning from $REPO_URL..."
-    $git = Get-Command "git" -ErrorAction SilentlyContinue
-    if (-not $git) {
-        Write-Fail "git is required but not found."
+    if (-not $GitBin) {
+        $GitBin = Ensure-GitInstalled
+    }
+    if (-not $GitBin) {
+        Write-Fail "git is required for repository install but could not be installed automatically."
         Write-Fail "Install git: https://git-scm.com/download/win"
         exit 1
     }
 
-    & git clone --depth 1 $REPO_URL $tmpDir 2>&1 | ForEach-Object { Write-Verbose $_ }
+    Write-Info "Cloning from $REPO_URL..."
+    & $GitBin clone --depth 1 $REPO_URL $tmpDir 2>&1 | ForEach-Object { Write-Verbose $_ }
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "git clone failed. Check network connection."
         Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -280,14 +401,37 @@ function Install-FromNpmPack {
     }
 }
 
+function Install-FromGitHubTarball {
+    $tmpDir = Join-Path $env:TEMP "gochat-download-$(Get-Random)"
+    $tarballPath = Join-Path $tmpDir "gochat-extension.tar.gz"
+    New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+
+    Write-Info "Downloading GitHub source tarball..."
+    try {
+        Invoke-WebRequest -Uri $REPO_TARBALL_URL -OutFile $tarballPath -UseBasicParsing -ErrorAction Stop
+        Install-FromTarball $tarballPath
+        return $true
+    } catch {
+        Write-Warn "GitHub source tarball download failed. Check network connection."
+        return $false
+    } finally {
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Install-Remote {
-    $git = Get-Command "git" -ErrorAction SilentlyContinue
-    if ($git) {
-        Install-FromGit
+    $gitPath = Ensure-GitInstalled
+    if ($gitPath) {
+        Install-FromGit -GitBin $gitPath
         return
     }
 
-    Write-Warn "git not found. Falling back to npm package install..."
+    Write-Warn "Falling back to GitHub source tarball..."
+    if (Install-FromGitHubTarball) {
+        return
+    }
+
+    Write-Warn "Falling back to npm package install..."
     Install-FromNpmPack
 }
 

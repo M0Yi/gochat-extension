@@ -11,6 +11,7 @@ EXTENSION_NAME="gochat"
 PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
+REPO_TARBALL_URL="https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 DEFAULT_RELAY_HTTP_URL="https://fund.moyi.vip"
 DEFAULT_RELAY_WS_URL="wss://fund.moyi.vip/ws/plugin"
 RELAY_HTTP_URL="${GOCHAT_RELAY_HTTP_URL:-${DEFAULT_RELAY_HTTP_URL}}"
@@ -225,32 +226,126 @@ ensure_dir_writable() {
 }
 
 # ──────────────────────────────────────────────
+# Git bootstrap
+# ──────────────────────────────────────────────
+
+run_with_privilege() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    return 1
+  fi
+}
+
+try_auto_install_git() {
+  if command -v git >/dev/null 2>&1; then
+    return 0
+  fi
+
+  warn "git not found. Attempting automatic installation..."
+
+  case "${PLATFORM}" in
+    macos)
+      if command -v brew >/dev/null 2>&1; then
+        brew install git || return 1
+      else
+        return 1
+      fi
+      ;;
+    linux|linux-wsl|bsd)
+      if command -v apt-get >/dev/null 2>&1; then
+        run_with_privilege apt-get update || return 1
+        run_with_privilege apt-get install -y git || return 1
+      elif command -v dnf >/dev/null 2>&1; then
+        run_with_privilege dnf install -y git || return 1
+      elif command -v yum >/dev/null 2>&1; then
+        run_with_privilege yum install -y git || return 1
+      elif command -v pacman >/dev/null 2>&1; then
+        run_with_privilege pacman -Sy --noconfirm git || return 1
+      elif command -v apk >/dev/null 2>&1; then
+        run_with_privilege apk add --no-cache git || return 1
+      elif command -v zypper >/dev/null 2>&1; then
+        run_with_privilege zypper install -y git || return 1
+      else
+        return 1
+      fi
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  if command -v git >/dev/null 2>&1; then
+    ok "git installed successfully."
+    return 0
+  fi
+
+  return 1
+}
+
+download_repo_tarball() {
+  local output_path="$1"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "${REPO_TARBALL_URL}" -o "${output_path}"
+    return $?
+  fi
+
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO "${output_path}" "${REPO_TARBALL_URL}"
+    return $?
+  fi
+
+  return 1
+}
+
+# ──────────────────────────────────────────────
 # Install functions
 # ──────────────────────────────────────────────
 
 install_from_tarball() {
   local tarball="$1"
   local extensions_dir
+  local target
+  local tmp_extract
+  local extracted_dir
   extensions_dir="$(get_extensions_dir)"
+  target="${extensions_dir}/${EXTENSION_NAME}"
 
   ensure_dir_writable "${extensions_dir}"
 
-  if [ -d "${extensions_dir}/${EXTENSION_NAME}" ]; then
+  if [ -d "${target}" ]; then
     info "Removing previous installation..."
-    rm -rf "${extensions_dir}/${EXTENSION_NAME}"
+    rm -rf "${target}"
   fi
 
-  info "Extracting to ${extensions_dir}/${EXTENSION_NAME}..."
-  tar -xzf "${tarball}" -C "${extensions_dir}"
+  info "Extracting to ${target}..."
+  tmp_extract="$(mktemp -d "${TMPDIR:-/tmp}/gochat-extract.XXXXXX")"
+  tar -xzf "${tarball}" -C "${tmp_extract}" || {
+    rm -rf "${tmp_extract}"
+    fail "Failed to extract tarball."
+    exit 1
+  }
 
-  if [ -f "${extensions_dir}/${EXTENSION_NAME}/package.json" ]; then
+  extracted_dir="$(find "${tmp_extract}" -mindepth 1 -maxdepth 1 -type d | head -1 || true)"
+  if [ -n "${extracted_dir}" ]; then
+    mv "${extracted_dir}" "${target}"
+  else
+    mv "${tmp_extract}" "${target}"
+    tmp_extract=""
+  fi
+  [ -n "${tmp_extract}" ] && rm -rf "${tmp_extract}"
+
+  if [ -f "${target}/package.json" ]; then
     info "Installing npm dependencies..."
-    (cd "${extensions_dir}/${EXTENSION_NAME}" && npm install --production 2>&1) || {
+    (cd "${target}" && npm install --production 2>&1) || {
       warn "npm install had warnings (non-fatal)"
     }
   fi
 
-  ok "Installed to ${extensions_dir}/${EXTENSION_NAME}"
+  ok "Installed to ${target}"
 }
 
 install_from_source() {
@@ -286,9 +381,14 @@ install_from_source() {
 
 install_piped() {
   local tmp_dir
+  local tarball
   tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/gochat-install.XXXXXX")"
 
   info "Pipe install detected..."
+  if ! command -v git &>/dev/null; then
+    try_auto_install_git || warn "Automatic git installation was unavailable. Falling back if possible..."
+  fi
+
   if command -v git &>/dev/null; then
     info "Cloning from ${REPO_URL}..."
     git clone --depth 1 "${REPO_URL}" "${tmp_dir}/gochat-extension" 2>&1 || {
@@ -298,6 +398,37 @@ install_piped() {
     }
     install_from_source "${tmp_dir}/gochat-extension"
     rm -rf "${tmp_dir}"
+  elif command -v curl &>/dev/null || command -v wget &>/dev/null; then
+    info "git not found. Falling back to GitHub source tarball..."
+    tarball="${tmp_dir}/gochat-extension.tar.gz"
+    if download_repo_tarball "${tarball}"; then
+      install_from_tarball "${tarball}"
+      rm -rf "${tmp_dir}"
+    elif command -v npm &>/dev/null; then
+      warn "GitHub source tarball download failed. Falling back to npm package install..."
+      local pack_log
+      pack_log="${tmp_dir}/npm-pack.log"
+      (
+        cd "${tmp_dir}" &&
+        npm pack "${PACKAGE_NAME}" --silent
+      ) >"${pack_log}" 2>&1 || {
+        fail "npm package install failed. Check npm registry access."
+        rm -rf "${tmp_dir}"
+        exit 1
+      }
+      tarball="$(tail -n 1 "${pack_log}")"
+      if [ -z "${tarball}" ] || [ ! -f "${tmp_dir}/${tarball}" ]; then
+        fail "npm pack did not produce a tarball."
+        rm -rf "${tmp_dir}"
+        exit 1
+      fi
+      install_from_tarball "${tmp_dir}/${tarball}"
+      rm -rf "${tmp_dir}"
+    else
+      fail "GitHub source tarball download failed, and npm is not available."
+      rm -rf "${tmp_dir}"
+      exit 1
+    fi
   elif command -v npm &>/dev/null; then
     info "git not found. Falling back to npm package install..."
     local pack_log
@@ -310,7 +441,6 @@ install_piped() {
       rm -rf "${tmp_dir}"
       exit 1
     }
-    local tarball
     tarball="$(tail -n 1 "${pack_log}")"
     if [ -z "${tarball}" ] || [ ! -f "${tmp_dir}/${tarball}" ]; then
       fail "npm pack did not produce a tarball."
@@ -320,11 +450,12 @@ install_piped() {
     install_from_tarball "${tmp_dir}/${tarball}"
     rm -rf "${tmp_dir}"
   else
-    fail "Pipe install requires git or npm, but neither is installed."
+    fail "Pipe install requires git, curl/wget, or npm, but none are installed."
     fail "Install one of them first:"
     case "${PLATFORM}" in
-      macos)     fail "  brew install git" ;;
-      linux|linux-wsl) fail "  sudo apt install git  OR  sudo apt install npm" ;;
+      macos)           fail "  brew install git  OR  brew install curl  OR  brew install node" ;;
+      linux|linux-wsl) fail "  sudo apt install git  OR  sudo apt install curl  OR  sudo apt install npm" ;;
+      bsd)             fail "  pkg install git  OR  pkg install curl  OR  pkg install npm" ;;
     esac
     rm -rf "${tmp_dir}"
     exit 1
