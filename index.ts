@@ -38,7 +38,7 @@ export default defineChannelPluginEntry({
     });
 
     api.registerCli(
-      ({ program }) => {
+      ({ program, config: cfg }) => {
         const gochatCmd = program
           .command("gochat")
           .description("GoChat custom backend management");
@@ -48,12 +48,10 @@ export default defineChannelPluginEntry({
           .description("Display connection ID and secret key for GoChat")
           .option("-a, --account <accountId>", "Account ID (default: default account)")
           .action(async (options) => {
-            const core = api.getCore();
-            const cfg = core.config.loadConfig() as CoreConfig;
             const accountId = options.account || undefined;
 
             try {
-              const account = resolveGoChatAccount({ cfg, accountId });
+              const account = resolveGoChatAccount({ cfg: cfg as CoreConfig, accountId });
 
               console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
               console.log("  GoChat Connection Credentials");
