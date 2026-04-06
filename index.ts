@@ -17,6 +17,28 @@ export default defineChannelPluginEntry({
   registerCliMetadata(api) {
     api.registerCli(
       ({ program }) => {
+        program
+          .command("gochat")
+          .description("GoChat custom backend management");
+      },
+      {
+        descriptors: [
+          {
+            name: "gochat",
+            description: "GoChat custom backend management",
+            hasSubcommands: true,
+          },
+        ],
+      },
+    );
+  },
+  registerFull(api) {
+    api.registerTool(createGoChatTaskTool(), {
+      name: "gochat_tasks",
+    });
+
+    api.registerCli(
+      ({ program }) => {
         const gochatCmd = program
           .command("gochat")
           .description("GoChat custom backend management");
@@ -29,10 +51,10 @@ export default defineChannelPluginEntry({
             const core = api.getCore();
             const cfg = core.config.loadConfig() as CoreConfig;
             const accountId = options.account || undefined;
-            
+
             try {
               const account = resolveGoChatAccount({ cfg, accountId });
-              
+
               console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
               console.log("  GoChat Connection Credentials");
               console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
@@ -41,7 +63,7 @@ export default defineChannelPluginEntry({
               console.log(`  Status:          ${account.enabled ? '✓ Enabled' : '✗ Disabled'}`);
               console.log(`  Secret Source:   ${account.secretSource}`);
               console.log("");
-              
+
               if (account.mode === "relay") {
                 console.log("  Relay Configuration:");
                 console.log(`    Channel ID:    ${account.channelId || "(not set)"}`);
@@ -53,7 +75,7 @@ export default defineChannelPluginEntry({
                 console.log(`    Port:          ${account.directPort}`);
                 console.log(`    Secret Key:    ${account.secret ? account.secret.substring(0, 20) + "..." : "(auto-generated)"}`);
               }
-              
+
               console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
             } catch (error) {
               console.error("\n✗ Error retrieving credentials:");
@@ -62,18 +84,9 @@ export default defineChannelPluginEntry({
               process.exit(1);
             }
           });
-
-        program
-          .command("gochat")
-          .description("GoChat custom backend management");
       },
       {
         descriptors: [
-          {
-            name: "gochat",
-            description: "GoChat custom backend management",
-            hasSubcommands: true,
-          },
           {
             name: "gochat show-credentials",
             description: "Display connection ID and secret key",
@@ -82,10 +95,5 @@ export default defineChannelPluginEntry({
         ],
       },
     );
-  },
-  registerFull(api) {
-    api.registerTool(createGoChatTaskTool(), {
-      name: "gochat_tasks",
-    });
   },
 });
