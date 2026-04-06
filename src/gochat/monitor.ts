@@ -30,6 +30,34 @@ function getPluginVersion(): string {
   return _pluginVersion;
 }
 
+function getRuntimePlatform(): string {
+  try {
+    const unameOut: string = process.platform;
+    switch (unameOut) {
+      case "darwin": return "macos";
+      case "linux": {
+        try {
+          const versionFile = readFileSync("/proc/version", "utf-8");
+          if (versionFile.toLowerCase().includes("microsoft")) return "linux-wsl";
+        } catch { /* not WSL */ }
+        return "linux";
+      }
+      case "win32": return "windows";
+      default: return unameOut;
+    }
+  } catch {
+    return "unknown";
+  }
+}
+
+function getRuntimeArch(): string {
+  return process.arch;
+}
+
+function getNodeVersion(): string {
+  return process.version;
+}
+
 export async function monitorGoChatProvider(
   opts: {
     accountId?: string;
@@ -172,8 +200,11 @@ export async function monitorGoChatProvider(
         status: resolveStatus(),
         uptime: Math.floor((Date.now() - startedAt) / 1000),
         metadata: {
-          openclawVersion: getPluginVersion(),
+          openclawVersion: core.version,
+          pluginVersion: getPluginVersion(),
           accountId: account?.accountId || "default",
+          platform: `${getRuntimePlatform()} (${getRuntimeArch()})`,
+          nodeVersion: getNodeVersion(),
         },
       };
     },

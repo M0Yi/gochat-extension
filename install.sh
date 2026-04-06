@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.3.28"
+VERSION="2026.4.6-plugin.9"
 EXTENSION_NAME="gochat"
 PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
@@ -36,10 +36,21 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-info()  { printf "${CYAN}${BOLD}[gochat]${NC} %s\n" "$*"; }
-ok()    { printf "${GREEN}${BOLD}[gochat]${NC} %s\n" "$*"; }
-warn()  { printf "${YELLOW}${BOLD}[gochat]${NC} %s\n" "$*"; }
-fail()  { printf "${RED}${BOLD}[gochat]${NC} %s\n" "$*"; }
+info()  { printf "${CYAN}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
+ok()    { printf "${GREEN}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
+warn()  { printf "${YELLOW}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
+fail()  { printf "${RED}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
+
+# ──────────────────────────────────────────────
+# JSON parsing helper (WSL-safe)
+# Uses process.argv instead of /dev/stdin which is unreliable in WSL.
+# Supports dot-notation keys: json_val '{"a":{"b":1}}' 'a.b' → 1
+# ──────────────────────────────────────────────
+json_val() {
+  local json_data="$1"
+  local key="$2"
+  node -e "const a=process.argv.slice(1),k=a[0],d=JSON.parse(a[1]);let v=d;for(const s of k.split('.')){if(v==null||v[s]===undefined){v=null;break}v=v[s]}if(v!==null&&v!==undefined)process.stdout.write(String(v))" "$key" "$json_data" 2>/dev/null || true
+}
 
 # ──────────────────────────────────────────────
 # OS & Architecture Detection
@@ -255,12 +266,13 @@ install_from_source() {
   fi
 
   info "Copying to ${extensions_dir}/${EXTENSION_NAME}..."
-  rsync -a --exclude='node_modules' --exclude='.git' "${source_dir}/" "${extensions_dir}/${EXTENSION_NAME}/" 2>/dev/null || {
-    # Fallback: copy then remove unwanted dirs
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --exclude='node_modules' --exclude='.git' "${source_dir}/" "${extensions_dir}/${EXTENSION_NAME}/"
+  else
     cp -r "${source_dir}" "${extensions_dir}/${EXTENSION_NAME}"
-    rm -rf "${extensions_dir}/${EXTENSION_NAME}/node_modules"
-    rm -rf "${extensions_dir}/${EXTENSION_NAME}/.git"
-  }
+    rm -rf "${extensions_dir}/${EXTENSION_NAME}/node_modules" 2>/dev/null || true
+    rm -rf "${extensions_dir}/${EXTENSION_NAME}/.git" 2>/dev/null || true
+  fi
 
   if [ -f "${extensions_dir}/${EXTENSION_NAME}/package.json" ]; then
     info "Installing npm dependencies..."
@@ -371,30 +383,10 @@ claim_relay_pair_code() {
   local reg_secret=""
   local reg_name=""
   local reg_relay_url=""
-  reg_channel_id="$(echo "${reg_response}" | node -e "
-    try {
-      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-      if (d.channelId) process.stdout.write(d.channelId);
-    } catch {}
-  " 2>/dev/null || true)"
-  reg_secret="$(echo "${reg_response}" | node -e "
-    try {
-      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-      if (d.secret) process.stdout.write(d.secret);
-    } catch {}
-  " 2>/dev/null || true)"
-  reg_name="$(echo "${reg_response}" | node -e "
-    try {
-      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-      if (d.name) process.stdout.write(d.name);
-    } catch {}
-  " 2>/dev/null || true)"
-  reg_relay_url="$(echo "${reg_response}" | node -e "
-    try {
-      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-      if (d.relayPlatformUrl) process.stdout.write(d.relayPlatformUrl);
-    } catch {}
-  " 2>/dev/null || true)"
+  reg_channel_id="$(json_val "${reg_response}" 'channelId')"
+  reg_secret="$(json_val "${reg_response}" 'secret')"
+  reg_name="$(json_val "${reg_response}" 'name')"
+  reg_relay_url="$(json_val "${reg_response}" 'relayPlatformUrl')"
 
   if [ -z "${reg_channel_id}" ] || [ -z "${reg_secret}" ]; then
     fail "Connection code response missing channelId or secret."
@@ -450,11 +442,11 @@ register_relay() {
   local existing_id
   existing_id="$(node -e "
     try {
-      const c = JSON.parse(require('fs').readFileSync('${config_file}','utf8'));
+      const c = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
       const g = c.channels && c.channels.gochat;
       if (g && g.channelId) process.stdout.write(g.channelId);
     } catch {}
-  " 2>/dev/null || true)"
+  " "${config_file}" 2>/dev/null || true)"
 
   if [ -n "${existing_id}" ]; then
     info "Existing channelId: ${existing_id} — skipping registration."
@@ -478,18 +470,8 @@ register_relay() {
 
   local reg_channel_id=""
   local reg_secret=""
-  reg_channel_id="$(echo "${reg_response}" | node -e "
-    try {
-      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-      if (d.channelId) process.stdout.write(d.channelId);
-    } catch {}
-  " 2>/dev/null || true)"
-  reg_secret="$(echo "${reg_response}" | node -e "
-    try {
-      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-      if (d.secret) process.stdout.write(d.secret);
-    } catch {}
-  " 2>/dev/null || true)"
+  reg_channel_id="$(json_val "${reg_response}" "channelId")"
+  reg_secret="$(json_val "${reg_response}" "secret")"
 
   if [ -z "${reg_channel_id}" ] || [ -z "${reg_secret}" ]; then
     warn "Registration response missing channelId or secret."
@@ -704,6 +686,23 @@ main() {
   fi
 
   configure_gochat "${MODE}" "${PAIR_CODE}"
+
+  echo ""
+  printf "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+  printf "${CYAN}${BOLD}  Environment Summary${NC}\n"
+  printf "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+  printf "  Plugin:        GoChat v${VERSION}\n"
+  printf "  Platform:      ${PLATFORM} (${ARCH})\n"
+  printf "  Node.js:       ${node_version}\n"
+  if [ -n "${OPENCLAW_BIN}" ]; then
+    local oc_ver
+    oc_ver="$("${OPENCLAW_BIN}" --version 2>/dev/null | head -1 || echo "unknown")"
+    printf "  OpenClaw:      ${oc_ver}\n"
+  else
+    printf "  OpenClaw:      (not installed)\n"
+  fi
+  printf "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+  echo ""
 
   printf "${GREEN}${BOLD}GoChat extension installed successfully!${NC}\n"
 }
