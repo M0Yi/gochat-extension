@@ -66,12 +66,12 @@ export default defineChannelPluginEntry({
                 console.log("  Relay Configuration:");
                 console.log(`    Channel ID:    ${account.channelId || "(not set)"}`);
                 console.log(`    Relay URL:     ${account.relayPlatformUrl}`);
-                console.log(`    Secret Key:    ${account.secret ? account.secret.substring(0, 20) + "..." : "(not set)"}`);
+                console.log(`    Secret Key:    ${account.secret || "(not set)"}`);
               } else {
                 console.log("  Local Configuration:");
                 console.log(`    Host:          ${account.directHost}`);
                 console.log(`    Port:          ${account.directPort}`);
-                console.log(`    Secret Key:    ${account.secret ? account.secret.substring(0, 20) + "..." : "(auto-generated)"}`);
+                console.log(`    Secret Key:    ${account.secret || "(auto-generated)"}`);
               }
 
               console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
