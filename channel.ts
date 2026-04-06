@@ -329,7 +329,7 @@ export const gochatPlugin: ChannelPlugin<ResolvedGoChatAccount> = createChatChan
             account.secret = data.secret;
           } catch (err) {
             console.warn(`[gochat] auto-registration failed: ${err instanceof Error ? err.message : String(err)}`);
-            console.warn(`[gochat] relay will fail without channelId. Run: openclaw gochat setup`);
+            console.warn(`[gochat] relay will fail without channelId. Run: openclaw plugins list to verify plugin is loaded`);
           }
         }
 

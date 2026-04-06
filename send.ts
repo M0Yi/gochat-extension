@@ -7,7 +7,6 @@ import type { CoreConfig, GoChatSendResult } from "./types.js";
 
 let directStorage: import("./direct/storage.js").GoChatDirectStorage | null = null;
 let relayWsSender: ((data: any) => void) | null = null;
-let relayStatusReporter: ((status: "idle" | "writing" | "researching" | "executing" | "syncing" | "error") => void) | null = null;
 
 export function setDirectStorage(
   storage: import("./direct/storage.js").GoChatDirectStorage | null,
@@ -19,12 +18,6 @@ export function setRelayWsSender(
   sender: ((data: any) => void) | null,
 ): void {
   relayWsSender = sender;
-}
-
-export function setRelayStatusReporter(
-  reporter: ((status: "idle" | "writing" | "researching" | "executing" | "syncing" | "error") => void) | null,
-): void {
-  relayStatusReporter = reporter;
 }
 
 type GoChatSendOpts = {
@@ -149,10 +142,8 @@ async function sendRelay(
   accountId: string,
   relayPlatformUrl: string,
 ): Promise<GoChatSendResult> {
-  relayStatusReporter?.("syncing");
   if (!relayWsSender) {
     console.error(`[gochat:relay] Cannot send reply — relayWsSender is null (relay not connected)`);
-    relayStatusReporter?.("error");
     throw new Error("GoChat relay not connected");
   }
 
@@ -175,12 +166,7 @@ async function sendRelay(
   }
   const mediaLabel = finalMediaUrl ? ` mediaUrl="${finalMediaUrl.substring(0, 120)}..."` : '';
   console.log(`[gochat:relay] Sending reply to conv=${conversationId} text="${text.substring(0, 80)}..."${mediaLabel}`);
-  try {
-    relayWsSender(payload);
-  } catch (error) {
-    relayStatusReporter?.("error");
-    throw error;
-  }
+  relayWsSender(payload);
 
   const messageId = `ws-${Date.now()}`;
   recordGoChatOutboundActivity(accountId);

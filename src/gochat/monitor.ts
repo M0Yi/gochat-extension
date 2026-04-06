@@ -6,7 +6,7 @@ import { resolveGoChatAccount, listGoChatAccountIds } from "../accounts.js";
 import { handleGoChatInbound } from "../inbound.js";
 import { getGoChatRuntime } from "../runtime.js";
 import { createRelayWSConnection } from "./relay-ws.js";
-import { setRelayWsSender } from "../send.js";
+import { setRelayStatusReporter, setRelayWsSender } from "../send.js";
 import type {
   CoreConfig,
   GoChatInboundMessage,
@@ -61,9 +61,76 @@ export async function monitorGoChatProvider(
   });
 
   const startedAt = Date.now();
-  let isWorking = false;
+  let activeJobs = 0;
+  let transientStatus: "syncing" | "error" | null = null;
+  let transientUntil = 0;
+  let transientTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const { start: startRelay, stop: stopRelay, send: sendRelay } = createRelayWSConnection({
+  const clearTransientTimer = (): void => {
+    if (transientTimer) {
+      clearTimeout(transientTimer);
+      transientTimer = null;
+    }
+  };
+
+  const resolveStatus = (): "idle" | "executing" | "syncing" | "error" => {
+    const now = Date.now();
+    if (transientStatus && transientUntil > now) {
+      return transientStatus;
+    }
+    if (activeJobs > 0) {
+      return "executing";
+    }
+    return "idle";
+  };
+
+  let lastReportedStatus = resolveStatus();
+
+  let pushRelayStatusNow = (): void => {};
+
+  const scheduleStatusReset = (): void => {
+    clearTransientTimer();
+    if (!transientStatus) {
+      return;
+    }
+    const delay = Math.max(0, transientUntil - Date.now());
+    transientTimer = setTimeout(() => {
+      transientStatus = null;
+      transientUntil = 0;
+      publishStatus();
+    }, delay);
+  };
+
+  const publishStatus = (): void => {
+    const nextStatus = resolveStatus();
+    if (nextStatus === lastReportedStatus) {
+      return;
+    }
+    lastReportedStatus = nextStatus;
+    pushRelayStatusNow();
+  };
+
+  const setTransientStatus = (
+    status: "syncing" | "error",
+    ttlMs: number,
+  ): void => {
+    transientStatus = status;
+    transientUntil = Date.now() + ttlMs;
+    scheduleStatusReset();
+    publishStatus();
+  };
+
+  const beginJob = (): void => {
+    activeJobs += 1;
+    publishStatus();
+  };
+
+  const finishJob = (): void => {
+    activeJobs = Math.max(0, activeJobs - 1);
+    publishStatus();
+  };
+
+  const { start: startRelay, stop: stopRelay, send: sendRelay, sendStatusNow } = createRelayWSConnection({
     platformUrl: account.relayPlatformUrl,
     channelId: account.channelId,
     secret: account.secret,
@@ -78,7 +145,7 @@ export async function monitorGoChatProvider(
         await opts.onMessage(message);
         return;
       }
-      isWorking = true;
+      beginJob();
       try {
         await handleGoChatInbound({
           message,
@@ -88,20 +155,26 @@ export async function monitorGoChatProvider(
           statusSink: opts.statusSink,
         });
       } finally {
-        isWorking = false;
+        finishJob();
       }
     },
     onError: (error) => {
+      setTransientStatus("error", 8_000);
       logger.error(`[gochat:${account.accountId}] relay error: ${error.message}`);
     },
     abortSignal: opts.abortSignal,
     statusProvider: () => {
       const accountIds = listGoChatAccountIds(cfg);
       return {
+        type: "plugin",
         version: getPluginVersion(),
         agentCount: accountIds.length,
-        status: isWorking ? "working" : "idle",
+        status: resolveStatus(),
         uptime: Math.floor((Date.now() - startedAt) / 1000),
+        metadata: {
+          openclawVersion: getPluginVersion(),
+          accountId: account?.accountId || "default",
+        },
       };
     },
   });
@@ -110,6 +183,21 @@ export async function monitorGoChatProvider(
     return { stop: stopRelay };
   }
 
+  pushRelayStatusNow = sendStatusNow;
+  setRelayStatusReporter((status) => {
+    if (status === "error") {
+      setTransientStatus("error", 8_000);
+      return;
+    }
+    if (status === "syncing") {
+      setTransientStatus("syncing", 3_000);
+      return;
+    }
+    transientStatus = null;
+    transientUntil = 0;
+    clearTransientTimer();
+    publishStatus();
+  });
   setRelayWsSender(sendRelay);
   await startRelay();
   logger.info(
@@ -118,6 +206,8 @@ export async function monitorGoChatProvider(
 
   return {
     stop: () => {
+      clearTransientTimer();
+      setRelayStatusReporter(null);
       setRelayWsSender(null);
       stopRelay();
     },

@@ -3,10 +3,12 @@ import crypto from "node:crypto";
 import type { WebSocket as WS } from "ws";
 
 export interface RelayStatusPayload {
+  type: string;
   version: string;
   agentCount: number;
-  status: "idle" | "working";
+  status: string;
   uptime: number;
+  metadata?: Record<string, string>;
 }
 
 export interface RelayWSOptions {
@@ -33,6 +35,7 @@ function computeHmacSignature(secret: string, channelId: string, ts: number): st
 export function createRelayWSConnection(opts: RelayWSOptions): {
   start: () => Promise<void>;
   send: (data: any) => void;
+  sendStatusNow: () => void;
   stop: () => void;
 } {
   const { platformUrl, channelId, secret, onMessage, onError, abortSignal, statusProvider } = opts;
@@ -42,7 +45,6 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
   let backoffMs = INITIAL_BACKOFF_MS;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let pingTimer: ReturnType<typeof setTimeout> | null = null;
-  const startedAt = Date.now();
 
   function log(level: "info" | "warn" | "error", msg: string): void {
     const prefix = `[gochat:relay:${channelId}]`;
@@ -95,6 +97,30 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
     }
   }
 
+  function sendStatusNow(): void {
+    if (!ws || ws.readyState !== ws.OPEN || !statusProvider) {
+      return;
+    }
+    try {
+      const sp = statusProvider();
+      if (!sp) {
+        return;
+      }
+      ws.send(JSON.stringify({
+        type: "status",
+        clientType: sp.type,
+        version: sp.version,
+        agentCount: sp.agentCount,
+        status: sp.status,
+        uptime: sp.uptime,
+        metadata: sp.metadata,
+      }));
+      log("info", `status pushed: state=${sp.status} agents=${sp.agentCount}`);
+    } catch (err) {
+      log("warn", `status push failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   async function doConnect(): Promise<void> {
     const WebSocket = (await import("ws")).default;
     const ts = Math.floor(Date.now() / 1000);
@@ -114,6 +140,7 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
       socket.on("open", () => {
         backoffMs = INITIAL_BACKOFF_MS;
         log("info", `connected to ${platformUrl}`);
+        sendStatusNow();
         resolve();
       });
 
@@ -201,23 +228,12 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
       }
       try {
         ws.send(JSON.stringify({ type: "ping" }));
-        if (statusProvider) {
-          const sp = statusProvider();
-          if (sp) {
-            ws.send(JSON.stringify({
-              type: "status",
-              version: sp.version,
-              agentCount: sp.agentCount,
-              status: sp.status,
-              uptime: sp.uptime,
-            }));
-          }
-        }
+        sendStatusNow();
       } catch (err) {
         log("warn", `ping failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }, PING_INTERVAL_MS);
   }
 
-  return { start, send, stop };
+  return { start, send, sendStatusNow, stop };
 }
