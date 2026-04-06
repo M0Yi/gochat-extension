@@ -24,16 +24,16 @@ A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables c
 
 ---
 
-## Quick Install (One Command)
+## Quick Install (Relay By Default)
 
 ```bash
 curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
 ```
 
-For relay mode:
+Use a 6-digit connection code for zero-config pairing:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash -s -- --relay
+curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash -s -- 123456
 ```
 
 ---
@@ -56,7 +56,7 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
 
      STEP 2 — Download and install
        - Run: curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
-       - If user wants relay mode, add: bash -s -- --relay
+       - If the user already has a 6-digit connection code, use: bash -s -- 123456
        - If install.sh fails → fall back to manual method:
            git clone https://github.com/M0Yi/gochat-extension.git /tmp/gochat-extension
            cp -r /tmp/gochat-extension ~/.openclaw/extensions/gochat
@@ -70,10 +70,10 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
      STEP 4 — Report result to user
        - On success, print:
            "GoChat plugin installed successfully.
-            Mode: local (default) — built-in server starts on port 9750.
+            Mode: relay (default) — plugin will auto-connect to the GoChat relay.
             Start OpenClaw: openclaw gateway run"
-       - If relay was chosen, mention:
-           "Mode: relay — plugin will auto-connect to ws://localhost:9750/ws/plugin"
+       - If a 6-digit connection code was used, mention:
+           "Connection code accepted — relay credentials were provisioned automatically."
 
      DO NOT:
        - Do NOT modify OpenClaw config files unless the user explicitly asks.
@@ -95,8 +95,9 @@ chmod +x install.sh
 ./install.sh
 
 # Or install with specific mode:
-./install.sh --local   # Local mode (default, zero-config)
-./install.sh --relay    # Relay mode (WebSocket relay)
+./install.sh           # Relay mode (default)
+./install.sh 123456    # Relay mode with 6-digit connection code
+./install.sh --local   # Local mode
 ```
 
 ### Option 2: Install via npm
@@ -151,7 +152,10 @@ Relay mode connects to the GoChat platform WebSocket relay.
 
 ```bash
 # Install with relay mode
-./install.sh --relay
+./install.sh
+
+# Install and bind to a web-generated 6-digit connection code
+./install.sh 123456
 
 # Configure relay URL (if not using default)
 # Edit ~/.openclaw/config.yaml:

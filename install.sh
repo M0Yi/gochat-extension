@@ -11,8 +11,10 @@ EXTENSION_NAME="gochat"
 PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
-RELAY_HTTP_URL="https://fund.moyi.vip"
-RELAY_WS_URL="wss://fund.moyi.vip/ws/plugin"
+DEFAULT_RELAY_HTTP_URL="https://fund.moyi.vip"
+DEFAULT_RELAY_WS_URL="wss://fund.moyi.vip/ws/plugin"
+RELAY_HTTP_URL="${GOCHAT_RELAY_HTTP_URL:-${DEFAULT_RELAY_HTTP_URL}}"
+RELAY_WS_URL="${GOCHAT_RELAY_WS_URL:-${DEFAULT_RELAY_WS_URL}}"
 
 # ──────────────────────────────────────────────
 # Globals (ALL declared upfront for set -u)
@@ -301,6 +303,7 @@ install_piped() {
 
 configure_gochat() {
   local mode="$1"
+  local pair_code="${2:-}"
   local extensions_dir
   extensions_dir="$(get_extensions_dir)"
 
@@ -313,9 +316,12 @@ configure_gochat() {
   if [ "${mode}" = "relay" ]; then
     info "  relay:         ${RELAY_WS_URL}"
     info "  dmPolicy:      open (skip pairing)"
+    if [ -n "${pair_code}" ]; then
+      info "  connectCode:   ${pair_code}"
+    fi
     info "──────────────────────────"
     echo ""
-    register_relay
+    register_relay "${pair_code}"
   else
     info "  server:        built-in HTTP API on port 9750"
     info "  dmPolicy:      open"
@@ -332,10 +338,109 @@ configure_gochat() {
   echo ""
 }
 
+ensure_config_file() {
+  local config_file="$1"
+  local config_dir
+  config_dir="$(dirname "${config_file}")"
+  mkdir -p "${config_dir}"
+  if [ ! -f "${config_file}" ]; then
+    printf "{\n}\n" > "${config_file}"
+  fi
+}
+
+claim_relay_pair_code() {
+  local config_file="$1"
+  local pair_code="$2"
+
+  ensure_config_file "${config_file}"
+
+  info "Claiming connection code ${pair_code}..."
+  local reg_response
+  reg_response="$(curl -sf -X POST "${RELAY_HTTP_URL}/api/plugin/pair/claim" \
+    -H "Content-Type: application/json" \
+    -d "{\"code\":\"${pair_code}\",\"name\":\"OpenClaw GoChat Plugin\"}" \
+    --connect-timeout 10 \
+    --max-time 20 2>/dev/null || true)"
+
+  if [ -z "${reg_response}" ]; then
+    fail "Failed to claim connection code. Check the code and network, then try again."
+    exit 1
+  fi
+
+  local reg_channel_id=""
+  local reg_secret=""
+  local reg_name=""
+  local reg_relay_url=""
+  reg_channel_id="$(echo "${reg_response}" | node -e "
+    try {
+      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+      if (d.channelId) process.stdout.write(d.channelId);
+    } catch {}
+  " 2>/dev/null || true)"
+  reg_secret="$(echo "${reg_response}" | node -e "
+    try {
+      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+      if (d.secret) process.stdout.write(d.secret);
+    } catch {}
+  " 2>/dev/null || true)"
+  reg_name="$(echo "${reg_response}" | node -e "
+    try {
+      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+      if (d.name) process.stdout.write(d.name);
+    } catch {}
+  " 2>/dev/null || true)"
+  reg_relay_url="$(echo "${reg_response}" | node -e "
+    try {
+      const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+      if (d.relayPlatformUrl) process.stdout.write(d.relayPlatformUrl);
+    } catch {}
+  " 2>/dev/null || true)"
+
+  if [ -z "${reg_channel_id}" ] || [ -z "${reg_secret}" ]; then
+    fail "Connection code response missing channelId or secret."
+    exit 1
+  fi
+
+  if [ -z "${reg_relay_url}" ]; then
+    reg_relay_url="${RELAY_WS_URL}"
+  fi
+
+  ok "Connection code accepted. channelId=${reg_channel_id}"
+
+  info "Writing config..."
+  node -e "
+    const fs = require('fs');
+    const c = JSON.parse(fs.readFileSync('${config_file}','utf8'));
+    if (!c.channels) c.channels = {};
+    c.channels.gochat = Object.assign(c.channels.gochat || {}, {
+      enabled: true,
+      mode: 'relay',
+      name: '${reg_name}',
+      channelId: '${reg_channel_id}',
+      webhookSecret: '${reg_secret}',
+      relayPlatformUrl: '${reg_relay_url}',
+      dmPolicy: 'open'
+    });
+    fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
+  " 2>/dev/null || {
+    fail "Failed to write config."
+    exit 1
+  }
+  ok "Config saved."
+
+  print_credentials
+}
+
 register_relay() {
+  local pair_code="${1:-}"
   local openclaw_dir
   openclaw_dir="$(get_openclaw_dir)"
   local config_file="${openclaw_dir}/openclaw.json"
+
+  if [ -n "${pair_code}" ]; then
+    claim_relay_pair_code "${config_file}" "${pair_code}"
+    return 0
+  fi
 
   if [ ! -f "${config_file}" ]; then
     warn "Config not found (${config_file}). Will register on first gateway start."
@@ -532,13 +637,18 @@ main() {
     warn "OpenClaw CLI not found. Extension will install but won't work until OpenClaw is installed."
   fi
 
-  local MODE="local"
+  local MODE="relay"
   local SOURCE=""
+  local PAIR_CODE=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
       --relay|-r)   MODE="relay"; shift ;;
       --local|-l)   MODE="local"; shift ;;
+      --code)
+        [ $# -lt 2 ] && { fail "--code requires an argument"; exit 1; }
+        PAIR_CODE="$2"; MODE="relay"; shift 2
+        ;;
       --mode)
         [ $# -lt 2 ] && { fail "--mode requires an argument"; exit 1; }
         MODE="$2"; shift 2
@@ -551,18 +661,28 @@ main() {
         echo "Usage: $0 [OPTIONS]"
         echo ""
         echo "Options:"
-        echo "  --local, -l            Local mode (default)"
-        echo "  --relay, -r            Relay mode (auto-register)"
+        echo "  --relay, -r            Relay mode (default, auto-register)"
+        echo "  --local, -l            Local mode"
+        echo "  --code <code>          Claim a 6-digit relay connection code"
         echo "  --mode <mode>          Set mode: local or relay"
         echo "  --from-tarball <path>  Install from .tar.gz"
         echo "  --help, -h             Show this help"
         echo ""
         echo "Pipe install:"
         echo "  curl -sL <url>/install.sh | bash"
-        echo "  curl -sL <url>/install.sh | bash -s -- --relay"
+        echo "  curl -sL <url>/install.sh | bash -s -- 123456"
         exit 0
         ;;
-      *) warn "Unknown option: $1"; exit 1 ;;
+      *)
+        if [ -z "${PAIR_CODE}" ] && [ "${1#-}" = "$1" ]; then
+          PAIR_CODE="$1"
+          MODE="relay"
+          shift
+        else
+          warn "Unknown option: $1"
+          exit 1
+        fi
+        ;;
     esac
   done
 
@@ -583,7 +703,7 @@ main() {
     fi
   fi
 
-  configure_gochat "${MODE}"
+  configure_gochat "${MODE}" "${PAIR_CODE}"
 
   printf "${GREEN}${BOLD}GoChat extension installed successfully!${NC}\n"
 }

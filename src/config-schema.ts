@@ -47,7 +47,7 @@ export const GoChatAccountSchemaBase = z
   .object({
     name: z.string().optional(),
     enabled: z.boolean().optional(),
-    mode: z.enum(["local", "relay"]).optional().default("local"),
+    mode: z.enum(["local", "relay"]).optional().default("relay"),
     markdown: MarkdownConfigSchema,
     webhookSecret: buildSecretInputSchema().optional(),
     webhookSecretFile: z.string().optional(),

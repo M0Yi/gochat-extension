@@ -52,17 +52,17 @@ export const gochatSetupWizard: ChannelSetupWizard = {
   textInputs: [
     {
       inputKey: "mode",
-      message: "Choose mode [local/relay] (default: local)",
+      message: "Choose mode [local/relay] (default: relay)",
       currentValue: ({ cfg, accountId }) =>
-        resolveGoChatAccount({ cfg: cfg as CoreConfig, accountId }).mode ?? "local",
+        resolveGoChatAccount({ cfg: cfg as CoreConfig, accountId }).mode ?? "relay",
       shouldPrompt: () => true,
       validate: ({ value }) =>
         value === "local" || value === "relay"
           ? undefined
           : "Mode must be 'local' or 'relay'",
-      normalizeValue: ({ value }) => (value?.trim().toLowerCase() || "local") as string,
+      normalizeValue: ({ value }) => (value?.trim().toLowerCase() || "relay") as string,
       applySet: async (params) => {
-        const mode = (params.value?.trim().toLowerCase() || "local") as "local" | "relay";
+        const mode = (params.value?.trim().toLowerCase() || "relay") as "local" | "relay";
         let nextCfg = setGoChatAccountConfig(params.cfg as CoreConfig, params.accountId, {
           mode,
           dmPolicy: "open",
