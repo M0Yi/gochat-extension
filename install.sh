@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.7-plugin.14"
+VERSION="2026.4.7-plugin.15"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -203,6 +203,12 @@ get_skills_dir() {
   echo "${openclaw_dir}/skills"
 }
 
+get_config_file() {
+  local openclaw_dir
+  openclaw_dir="$(get_openclaw_dir)"
+  echo "${openclaw_dir}/openclaw.json"
+}
+
 # ──────────────────────────────────────────────
 # Ensure directory is writable
 # ──────────────────────────────────────────────
@@ -319,6 +325,18 @@ install_from_tarball() {
   extensions_dir="$(get_extensions_dir)"
   target="${extensions_dir}/${EXTENSION_NAME}"
 
+  if [ -n "${OPENCLAW_BIN}" ] && [ -x "${OPENCLAW_BIN}" ]; then
+    info "Installing via OpenClaw managed plugin installer..."
+    if "${OPENCLAW_BIN}" plugins install "${tarball}" >/dev/null 2>&1; then
+      "${OPENCLAW_BIN}" plugins enable "${EXTENSION_NAME}" >/dev/null 2>&1 || true
+      ensure_plugin_trusted
+      ok "Installed to ${target}"
+      install_bundled_skills "${target}"
+      return 0
+    fi
+    warn "Managed install failed, falling back to direct file install."
+  fi
+
   ensure_dir_writable "${extensions_dir}"
 
   if [ -d "${target}" ]; then
@@ -358,6 +376,18 @@ install_from_source() {
   local source_dir="$1"
   local extensions_dir
   extensions_dir="$(get_extensions_dir)"
+
+  if [ -n "${OPENCLAW_BIN}" ] && [ -x "${OPENCLAW_BIN}" ]; then
+    info "Installing via OpenClaw managed plugin installer..."
+    if "${OPENCLAW_BIN}" plugins install "${source_dir}" >/dev/null 2>&1; then
+      "${OPENCLAW_BIN}" plugins enable "${EXTENSION_NAME}" >/dev/null 2>&1 || true
+      ensure_plugin_trusted
+      ok "Installed to ${extensions_dir}/${EXTENSION_NAME}"
+      install_bundled_skills "${extensions_dir}/${EXTENSION_NAME}"
+      return 0
+    fi
+    warn "Managed install failed, falling back to direct file install."
+  fi
 
   ensure_dir_writable "${extensions_dir}"
 
@@ -506,6 +536,24 @@ ensure_config_file() {
   if [ ! -f "${config_file}" ]; then
     printf "{\n}\n" > "${config_file}"
   fi
+}
+
+ensure_plugin_trusted() {
+  local config_file
+  config_file="$(get_config_file)"
+  ensure_config_file "${config_file}"
+
+  node -e "
+    const fs = require('fs');
+    const file = process.argv[1];
+    const pluginId = process.argv[2];
+    const c = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!c.plugins || typeof c.plugins !== 'object') c.plugins = {};
+    const allow = Array.isArray(c.plugins.allow) ? c.plugins.allow.slice() : [];
+    if (!allow.includes(pluginId)) allow.push(pluginId);
+    c.plugins.allow = allow;
+    fs.writeFileSync(file, JSON.stringify(c, null, 2) + '\n');
+  " "${config_file}" "${EXTENSION_NAME}" 2>/dev/null || true
 }
 
 ensure_gochat_install_defaults() {
