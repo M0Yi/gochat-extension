@@ -30,6 +30,24 @@ const GoChatAttachmentSchema = z.object({
   size: z.number().int().positive().optional(),
 });
 
+const GoChatLocalAudioTranscriptionSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    engine: z
+      .enum(["auto", "whisper", "faster-whisper", "mlx-whisper", "whisper-cpp"])
+      .optional(),
+    model: z.string().optional(),
+    language: z.string().optional(),
+    task: z.enum(["transcribe", "translate"]).optional(),
+    device: z.string().optional(),
+    computeType: z.string().optional(),
+    beamSize: z.number().int().positive().optional(),
+    wordTimestamps: z.boolean().optional(),
+    maxTranscriptChars: z.number().int().positive().optional(),
+  })
+  .strict()
+  .optional();
+
 export const GoChatWebhookPayloadSchema = z.object({
   messageId: z.string().min(1),
   conversationId: z.string().min(1),
@@ -58,6 +76,7 @@ export const GoChatAccountSchemaBase = z
     conversations: z.record(z.string(), GoChatConversationSchema.optional()).optional(),
     allowPrivateNetwork: z.boolean().optional(),
     trustedAttachmentHosts: z.array(z.string()).optional(),
+    localAudioTranscription: GoChatLocalAudioTranscriptionSchema,
     directPort: z.number().int().positive().optional(),
     directHost: z.string().optional(),
     relayPlatformUrl: z.string().optional(),

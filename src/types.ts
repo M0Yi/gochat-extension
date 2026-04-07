@@ -18,6 +18,19 @@ export type GoChatConversationConfig = {
 
 export type GoChatMode = "local" | "relay";
 
+export type GoChatLocalAudioTranscriptionConfig = {
+  enabled?: boolean;
+  engine?: "auto" | "whisper" | "faster-whisper" | "mlx-whisper" | "whisper-cpp";
+  model?: string;
+  language?: string;
+  task?: "transcribe" | "translate";
+  device?: string;
+  computeType?: string;
+  beamSize?: number;
+  wordTimestamps?: boolean;
+  maxTranscriptChars?: number;
+};
+
 export const DEFAULT_LOCAL_PORT = 9750;
 export const DEFAULT_LOCAL_HOST = "0.0.0.0";
 export const DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin";
@@ -44,6 +57,7 @@ export type GoChatAccountConfig = {
   mediaMaxMb?: number;
   allowPrivateNetwork?: boolean;
   trustedAttachmentHosts?: string[];
+  localAudioTranscription?: GoChatLocalAudioTranscriptionConfig;
   directPort?: number;
   directHost?: string;
   relayPlatformUrl?: string;

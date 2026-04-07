@@ -1,4 +1,9 @@
 import { buildAgentMediaPayload } from "openclaw/plugin-sdk/media-runtime";
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import {
   GROUP_POLICY_BLOCKED_LABEL,
   createChannelPairingController,
@@ -21,16 +26,29 @@ import { sendMessageGoChat } from "./send.js";
 import type { CoreConfig, GoChatAttachment, GoChatInboundMessage, GroupPolicy } from "./types.js";
 
 const CHANNEL_ID = "gochat" as const;
+const execFileAsync = promisify(execFile);
+const LOCAL_AUDIO_SKILL_NAME = "gochat-local-audio-notes";
+const DEFAULT_MAX_TRANSCRIPT_CHARS = 12000;
 
 type ResolvedMediaInfo = {
   path: string;
   contentType: string;
   kind: "image" | "audio" | "video" | "document" | "unknown";
+  name?: string;
 };
 
 type RemoteFetchResult = {
   buffer: Buffer;
   contentType?: string;
+};
+
+type LocalAudioTranscriptionResult = {
+  attachmentName?: string;
+  path: string;
+  engine: string;
+  model: string;
+  language?: string;
+  text: string;
 };
 
 function normalizeHost(value: string | undefined): string | null {
@@ -60,6 +78,136 @@ function resolveTrustedAttachmentHosts(account: ResolvedGoChatAccount): Set<stri
     }
   }
   return hosts;
+}
+
+function resolveLocalAudioScriptCandidates(): string[] {
+  const currentDir = dirname(fileURLToPath(import.meta.url));
+  const repoBundled = resolve(
+    currentDir,
+    "../skills/gochat-local-audio-notes/scripts/transcribe_audio.py",
+  );
+  const homeBundled = resolve(
+    process.env.OPENCLAW_STATE_DIR || resolve(process.env.HOME || "~", ".openclaw"),
+    "skills/gochat-local-audio-notes/scripts/transcribe_audio.py",
+  );
+  return [homeBundled, repoBundled];
+}
+
+function clipTranscript(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxChars)).trim()}\n...[transcript truncated]`;
+}
+
+function buildAudioTranscriptContext(transcripts: LocalAudioTranscriptionResult[]): string {
+  if (!transcripts.length) {
+    return "";
+  }
+  return transcripts
+    .map((entry, index) => {
+      const label = entry.attachmentName || `audio-${index + 1}`;
+      const meta = [
+        `engine=${entry.engine}`,
+        `model=${entry.model}`,
+        entry.language ? `language=${entry.language}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return [
+        `Local audio transcript for ${label}${meta ? ` (${meta})` : ""}:`,
+        entry.text,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+}
+
+async function resolveLocalAudioTranscripts(params: {
+  mediaList: ResolvedMediaInfo[];
+  account: ResolvedGoChatAccount;
+  logger: { warn: (message: string) => void; info?: (message: string) => void };
+}): Promise<LocalAudioTranscriptionResult[]> {
+  const { mediaList, account, logger } = params;
+  const settings = account.config.localAudioTranscription;
+  if (settings?.enabled === false) {
+    return [];
+  }
+
+  const audioMedia = mediaList.filter((item) => item.kind === "audio");
+  if (!audioMedia.length) {
+    return [];
+  }
+
+  const finalScriptPath =
+    resolveLocalAudioScriptCandidates().find((candidate) => existsSync(candidate)) ?? null;
+  if (!finalScriptPath) {
+    logger.warn("[gochat] local audio transcription script not found");
+    return [];
+  }
+
+  const maxChars = settings?.maxTranscriptChars ?? DEFAULT_MAX_TRANSCRIPT_CHARS;
+  const results: LocalAudioTranscriptionResult[] = [];
+
+  for (const media of audioMedia) {
+    const args = [
+      finalScriptPath,
+      media.path,
+      "--engine",
+      settings?.engine ?? "auto",
+      "--model",
+      settings?.model ?? process.env.GOCHAT_AUDIO_MODEL ?? "base",
+      "--task",
+      settings?.task ?? "transcribe",
+      "--device",
+      settings?.device ?? process.env.GOCHAT_AUDIO_DEVICE ?? "auto",
+      "--compute-type",
+      settings?.computeType ?? process.env.GOCHAT_AUDIO_COMPUTE_TYPE ?? "auto",
+      "--beam-size",
+      String(settings?.beamSize ?? Number(process.env.GOCHAT_AUDIO_BEAM_SIZE || 5)),
+      "--output-format",
+      "json",
+    ];
+    if (settings?.language) {
+      args.push("--language", settings.language);
+    }
+    if (settings?.wordTimestamps) {
+      args.push("--word-timestamps");
+    }
+
+    try {
+      const { stdout } = await execFileAsync("python3", args, {
+        timeout: 15 * 60 * 1000,
+        maxBuffer: 20 * 1024 * 1024,
+      });
+      const parsed = JSON.parse(stdout) as {
+        ok?: boolean;
+        engine?: string;
+        model?: string;
+        language?: string;
+        text?: string;
+      };
+      const transcriptText = clipTranscript(String(parsed.text ?? "").trim(), maxChars);
+      if (!transcriptText) {
+        continue;
+      }
+      results.push({
+        attachmentName: media.name,
+        path: media.path,
+        engine: String(parsed.engine ?? settings?.engine ?? "auto"),
+        model: String(parsed.model ?? settings?.model ?? "base"),
+        language: parsed.language ? String(parsed.language) : undefined,
+        text: transcriptText,
+      });
+    } catch (err) {
+      logger.warn(
+        `[gochat] local audio transcription failed for ${media.path}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return results;
 }
 
 function shouldBypassRemoteMediaSsrf(params: {
@@ -172,6 +320,7 @@ async function resolveGoChatMedia(
           path: saved.path,
           contentType,
           kind,
+          name: attachment.name,
         });
       }
     } catch (err) {
@@ -423,8 +572,17 @@ export async function handleGoChatInbound(params: {
   const mediaList = hasAttachments
     ? await resolveGoChatMedia(message.attachments, account)
     : [];
+  const logger = core.logging.getChildLogger({ channel: "gochat", accountId: account.accountId });
+  const audioTranscripts = mediaList.length
+    ? await resolveLocalAudioTranscripts({
+        mediaList,
+        account,
+        logger,
+      })
+    : [];
   const mediaPlaceholder = buildMediaPlaceholder(mediaList);
-  const bodyText = [rawBody, mediaPlaceholder].filter(Boolean).join("\n").trim();
+  const audioTranscriptContext = buildAudioTranscriptContext(audioTranscripts);
+  const bodyText = [rawBody, mediaPlaceholder, audioTranscriptContext].filter(Boolean).join("\n\n").trim();
 
   const body = core.channel.reply.formatAgentEnvelope({
     channel: "GoChat",
@@ -489,7 +647,9 @@ export async function handleGoChatInbound(params: {
       runtime.error?.(`gochat ${info.kind} reply failed: ${String(err)}`);
     },
     replyOptions: {
-      skillFilter: convConfig?.skills,
+      skillFilter: mediaList.some((item) => item.kind === "audio")
+        ? Array.from(new Set([...(convConfig?.skills ?? []), LOCAL_AUDIO_SKILL_NAME]))
+        : convConfig?.skills,
       disableBlockStreaming:
         typeof account.config.blockStreaming === "boolean"
           ? !account.config.blockStreaming

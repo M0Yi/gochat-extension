@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.6-plugin.9"
+VERSION="2026.4.6-plugin.11"
 EXTENSION_NAME="gochat"
 PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
@@ -198,6 +198,12 @@ get_extensions_dir() {
   echo "${openclaw_dir}/extensions"
 }
 
+get_skills_dir() {
+  local openclaw_dir
+  openclaw_dir="$(get_openclaw_dir)"
+  echo "${openclaw_dir}/skills"
+}
+
 # ──────────────────────────────────────────────
 # Ensure directory is writable
 # ──────────────────────────────────────────────
@@ -346,6 +352,7 @@ install_from_tarball() {
   fi
 
   ok "Installed to ${target}"
+  install_bundled_skills "${target}"
 }
 
 install_from_source() {
@@ -377,6 +384,30 @@ install_from_source() {
   fi
 
   ok "Installed to ${extensions_dir}/${EXTENSION_NAME}"
+  install_bundled_skills "${extensions_dir}/${EXTENSION_NAME}"
+}
+
+install_bundled_skills() {
+  local extension_dir="$1"
+  local source_skills_dir="${extension_dir}/skills"
+  local target_skills_dir
+  target_skills_dir="$(get_skills_dir)"
+
+  if [ ! -d "${source_skills_dir}" ]; then
+    return 0
+  fi
+
+  ensure_dir_writable "${target_skills_dir}"
+  info "Installing bundled skills to ${target_skills_dir}..."
+
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "${source_skills_dir}/" "${target_skills_dir}/"
+  else
+    mkdir -p "${target_skills_dir}"
+    cp -R "${source_skills_dir}/." "${target_skills_dir}/"
+  fi
+
+  ok "Bundled skills installed"
 }
 
 install_piped() {

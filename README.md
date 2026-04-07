@@ -9,6 +9,7 @@ A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables c
 
 - 🌐 Webhook-based message handling (send & receive)
 - 🖼️ Media support (images, audio, video, file attachments)
+- 🎙️ Bundled local audio notes skill with multi-engine local transcription options
 - 🔒 Flexible DM policies (open, pairing, allowlist, disabled)
 - 👥 Group chat support with per-conversation configuration
 - ⚡ Automatic reconnection for relay mode
@@ -173,6 +174,9 @@ channels:
     relayPlatformUrl: wss://fund.moyi.vip/ws/plugin
 ```
 
+The installer also copies bundled GoChat skills into `~/.openclaw/skills`, including the local audio workflow skill `gochat-local-audio-notes`.
+That skill bundles a local transcription script with multiple backend choices such as `whisper`, `faster-whisper`, `mlx-whisper`, and `whisper.cpp` when available.
+
 ### Configuration File
 
 Edit `~/.openclaw/config.yaml`:
@@ -206,6 +210,19 @@ channels:
     # The relay host from relayPlatformUrl is trusted automatically.
     trustedAttachmentHosts:
       - fund.moyi.vip
+
+    # Optional local transcription for inbound audio attachments
+    localAudioTranscription:
+      enabled: true
+      engine: auto
+      model: base
+      # language: zh
+      # task: transcribe
+      # device: auto
+      # computeType: auto
+      # beamSize: 5
+      # wordTimestamps: false
+      # maxTranscriptChars: 12000
 
     # Account-specific settings
     accounts:

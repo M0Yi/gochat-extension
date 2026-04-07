@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.6-plugin.9"
+$VERSION = "2026.4.6-plugin.11"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -151,6 +151,10 @@ function Get-ExtensionsDir {
     return Join-Path (Get-OpenClawDir) "extensions"
 }
 
+function Get-SkillsDir {
+    return Join-Path (Get-OpenClawDir) "skills"
+}
+
 function Ensure-DirWritable {
     param([string]$TargetDir)
 
@@ -218,6 +222,7 @@ function Install-FromSource {
     }
 
     Write-Ok "Installed to $target"
+    Install-BundledSkills $target
 }
 
 function Install-FromTarball {
@@ -265,6 +270,30 @@ function Install-FromTarball {
     }
 
     Write-Ok "Installed to $target"
+    Install-BundledSkills $target
+}
+
+function Install-BundledSkills {
+    param([string]$ExtensionDir)
+
+    $sourceSkillsDir = Join-Path $ExtensionDir "skills"
+    if (-not (Test-Path $sourceSkillsDir)) {
+        return
+    }
+
+    $targetSkillsDir = Get-SkillsDir
+    Ensure-DirWritable $targetSkillsDir
+    Write-Info "Installing bundled skills to $targetSkillsDir..."
+
+    Get-ChildItem -LiteralPath $sourceSkillsDir -Directory -Force | ForEach-Object {
+        $destination = Join-Path $targetSkillsDir $_.Name
+        if (Test-Path $destination) {
+            Remove-DirIfExists $destination
+        }
+        Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse -Force
+    }
+
+    Write-Ok "Bundled skills installed"
 }
 
 function Install-Remote {

@@ -43,6 +43,54 @@
             "items": { "type": "string" },
             "description": "Extra trusted hosts for inbound attachment downloads. The relay host is trusted automatically."
           },
+          "localAudioTranscription": {
+            "type": "object",
+            "description": "Optional local audio transcription settings for inbound audio attachments.",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Enable local transcription for inbound audio attachments (default: true)"
+              },
+              "engine": {
+                "type": "string",
+                "enum": ["auto", "whisper", "faster-whisper", "mlx-whisper", "whisper-cpp"],
+                "description": "Preferred local transcription engine"
+              },
+              "model": {
+                "type": "string",
+                "description": "Model name such as base, small, medium, or large-v3"
+              },
+              "language": {
+                "type": "string",
+                "description": "Optional language hint such as zh or en"
+              },
+              "task": {
+                "type": "string",
+                "enum": ["transcribe", "translate"],
+                "description": "Transcribe in source language or translate to English"
+              },
+              "device": {
+                "type": "string",
+                "description": "Device hint such as auto, cpu, cuda, or mps"
+              },
+              "computeType": {
+                "type": "string",
+                "description": "Backend-specific compute type, mainly for faster-whisper"
+              },
+              "beamSize": {
+                "type": "number",
+                "description": "Decoder beam size"
+              },
+              "wordTimestamps": {
+                "type": "boolean",
+                "description": "Request word timestamps when supported"
+              },
+              "maxTranscriptChars": {
+                "type": "number",
+                "description": "Maximum transcript characters injected into the agent context"
+              }
+            }
+          },
           "channelId": {
             "type": "string",
             "description": "Channel ID from GoChat relay platform (auto-registered)"
