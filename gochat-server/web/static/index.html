@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoChat — AI 原生的对话平台</title>
+<style>
+/* ========================================
+   DESIGN SYSTEM — Catppuccin Mocha Palette
+   ======================================== */
+:root {
+  /* Background colors */
+  --bg-base: #0f0f17;
+  --bg-surface: #1a1a2e;
+  --bg-surface-alt: #12121a;
+  --bg-overlay: #1e1e2e;
+  --bg-mantle: #181825;
+  --bg-crust: #11111b;
+  
+  /* Text colors */
+  --text-primary: #cdd6f4;
+  --text-secondary: #bac2de;
+  --text-muted: #585b70;
+  --text-subtle: #45475a;
+  
+  /* Accent colors */
+  --accent-blue: #89b4fa;
+  --accent-blue-hover: #74c7ec;
+  --accent-green: #a6e3a1;
+  --accent-red: #f38ba8;
+  --accent-yellow: #f9e2af;
+  --accent-pink: #f5c2e7;
+  --accent-teal: #94e2d5;
+  
+  /* Border colors */
+  --border-default: #313244;
+  --border-surface: #2a2a3e;
+  --border-overlay: #45475a;
+  
+  /* Spacing scale */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --space-4xl: 96px;
+  --space-5xl: 128px;
+  
+  /* Typography scale */
+  --font-xs: 12px;
+  --font-sm: 14px;
+  --font-md: 16px;
+  --font-lg: 20px;
+  --font-xl: 24px;
+  --font-2xl: 32px;
+  --font-3xl: 48px;
+  --font-4xl: 64px;
+  --font-5xl: 80px;
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+  --transition-slow: 500ms ease;
+  --transition-slower: 800ms ease;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow-blue: 0 0 40px rgba(137, 180, 250, 0.3);
+  --shadow-glow-green: 0 0 40px rgba(166, 227, 161, 0.3);
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+}
+
+/* ========================================
+   RESET & BASE STYLES
+   ======================================== */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+body {
+  font-family: "SF Pro Display", "PingFang SC", "Noto Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========================================
+   GRAIN TEXTURE OVERLAY
+   ======================================== */
+.grain-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* ========================================
+   LAYOUT STRUCTURE
+   ======================================== */
+.landing-container {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ========================================
+   LEFT STICKY PANEL
+   ======================================== */
+.sticky-panel {
+  position: sticky;
+  top: 0;
+  width: 50%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-base) 100%);
+  overflow: hidden;
+  border-right: 1px solid var(--border-default);
+}
+
+.sticky-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+}
+
+/* Architecture visualization stages */
+.arch-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity var(--transition-slow), transform var(--transition-slow);
+  pointer-events: none;
+}
+
+.arch-stage.active {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.arch-stage.exit {
+  opacity: 0;
+  transform: scale(1.1);
+}
+
+/* ========================================
+   RIGHT NARRATIVE PANEL
+   ======================================== */
+.narrative-panel {
+  width: 50%;
+  min-height: 100vh;
+  background: var(--bg-base);
+}
+
+.section {
+  min-height: 100vh;
+  padding: var(--space-4xl) var(--space-3xl);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity var(--transition-slow), transform var(--transition-slow);
+}
+
+.section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-inner {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+/* Section labels */
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-xs) var(--space-sm);
+  background: rgba(137, 180, 250, 0.1);
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(137, 180, 250, 0.2);
+}
+
+/* Headings */
+.section-title {
+  font-size: var(--font-4xl);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
+}
+
+.section-title span {
+  display: inline-block;
+}
+
+.section-title .highlight {
+  color: var(--accent-blue);
+  position: relative;
+}
+
+.section-title .highlight::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--accent-blue);
+  border-radius: 2px;
+}
+
+/* Body text */
+.section-body {
+  font-size: var(--font-lg);
+  font-weight: 300;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: var(--space-xl);
+}
+
+/* Feature lists */
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.feature-item:hover {
+  border-color: var(--accent-blue);
+  background: var(--bg-overlay);
+}
+
+.feature-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(137, 180, 250, 0.1);
+  border-radius: var(--radius-md);
+  color: var(--accent-blue);
+  flex-shrink: 0;
+}
+
+.feature-text h4 {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.feature-text p {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ========================================
+   HERO SECTION
+   ======================================== */
+.hero-section {
+  text-align: center;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--accent-green);
+  background: rgba(166, 227, 161, 0.1);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(166, 227, 161, 0.2);
+  margin-bottom: var(--space-xl);
+}
+
+.hero-title {
+  font-size: clamp(48px, 8vw, 80px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: var(--space-lg);
+}
+
+.hero-title .brand {
+  color: var(--accent-blue);
+  display: inline-block;
+  position: relative;
+}
+
+.hero-title .brand::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -16px;
+  right: -16px;
+  bottom: -8px;
+  background: radial-gradient(ellipse at center, rgba(137, 180, 250, 0.15) 0%, transparent 70%);
+  border-radius: var(--radius-lg);
+  z-index: -1;
+}
+
+.hero-subtitle {
+  font-size: var(--font-xl);
+  font-weight: 300;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2xl);
+  letter-spacing: 0.02em;
+}
+
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  background: var(--accent-blue);
+  color: var(--bg-base);
+  font-size: var(--font-md);
+  font-weight: 700;
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover {
+  background: var(--accent-blue-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow-blue);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-md);
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  border: 1px solid var(--border-default);
+  transition: all var(--transition-fast);
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+/* ========================================
+   FOOTER
+   ======================================== */
+.footer {
+  padding: var(--space-2xl) var(--space-3xl);
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-default);
+}
+
+.footer-content {
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-xl);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: var(--font-sm);
+  transition: color var(--transition-fast);
+}
+
+.footer-links a:hover {
+  color: var(--accent-blue);
+}
+
+.footer-version {
+  font-size: var(--font-xs);
+  color: var(--text-subtle);
+  font-family: "SF Mono", "Fira Code", monospace;
+  margin-bottom: var(--space-sm);
+}
+
+.footer-copyright {
+  font-size: var(--font-xs);
+  color: var(--text-subtle);
+}
+
+/* ========================================
+   SVG ARCHITECTURE DIAGRAMS
+   ======================================== */
+.arch-svg {
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+}
+
+.arch-node {
+  fill: var(--bg-overlay);
+  stroke: var(--border-default);
+  stroke-width: 2;
+  transition: all var(--transition-normal);
+}
+
+.arch-node.highlight {
+  fill: var(--bg-mantle);
+  stroke: var(--accent-blue);
+}
+
+.arch-node-text {
+  font-family: "SF Pro Display", "PingFang SC", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  fill: var(--text-primary);
+  text-anchor: middle;
+}
+
+.arch-node-sub {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 10px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+}
+
+.arch-connection {
+  stroke: var(--border-overlay);
+  stroke-width: 2;
+  fill: none;
+  stroke-dasharray: 6 4;
+  opacity: 0.3;
+  transition: all var(--transition-normal);
+}
+
+.arch-connection.active {
+  stroke: var(--accent-blue);
+  stroke-dasharray: none;
+  opacity: 1;
+}
+
+.arch-connection.animated {
+  stroke-dashoffset: 100;
+  animation: dash 20s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.arch-arrow {
+  fill: var(--accent-blue);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.arch-arrow.active {
+  opacity: 1;
+}
+
+.arch-label {
+  font-family: "SF Pro Display", "PingFang SC", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--accent-blue);
+  text-anchor: middle;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.arch-label.active {
+  opacity: 1;
+}
+
+.arch-icon {
+  fill: var(--text-muted);
+  transition: fill var(--transition-normal);
+}
+
+.arch-icon.active {
+  fill: var(--accent-blue);
+}
+
+.arch-icon-green.active {
+  fill: var(--accent-green);
+}
+
+.arch-icon-yellow.active {
+  fill: var(--accent-yellow);
+}
+
+.arch-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.arch-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+@media (max-width: 1024px) {
+  .landing-container {
+    flex-direction: column;
+  }
+  
+  .sticky-panel {
+    position: relative;
+    width: 100%;
+    height: 60vh;
+    min-height: 400px;
+    top: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border-default);
+  }
+  
+  .narrative-panel {
+    width: 100%;
+  }
+  
+  .section {
+    padding: var(--space-2xl) var(--space-lg);
+    min-height: auto;
+  }
+  
+  .section-title {
+    font-size: var(--font-3xl);
+  }
+  
+  .hero-title {
+    font-size: clamp(36px, 12vw, 56px);
+  }
+  
+  .hero-subtitle {
+    font-size: var(--font-lg);
+  }
+  
+  .section-body {
+    font-size: var(--font-md);
+  }
+  
+  .arch-svg {
+    max-width: 320px;
+  }
+  
+  .footer {
+    padding: var(--space-xl) var(--space-lg);
+  }
+}
+
+@media (max-width: 640px) {
+  .section-title {
+    font-size: var(--font-2xl);
+  }
+  
+  .hero-title {
+    font-size: clamp(28px, 10vw, 40px);
+  }
+  
+  .hero-cta {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .btn-primary, .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .feature-item {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .feature-icon {
+    margin: 0 auto;
+  }
+}
+
+/* ========================================
+   SCROLLBAR STYLING
+   ======================================== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-overlay);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+</style>
+</head>
+<body>
+<!-- Grain texture overlay -->
+<div class="grain-overlay"></div>
+
+<div class="landing-container">
+  <!-- ========================================
+       LEFT STICKY PANEL - Architecture Visualization
+       ======================================== -->
+  <div class="sticky-panel">
+    <div class="sticky-content">
+      
+      <!-- Stage 0: Hero - Logo only -->
+      <div class="arch-stage active" id="arch-0">
+        <svg class="arch-svg" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Central glow -->
+          <defs>
+            <radialGradient id="glow0" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#89b4fa" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#89b4fa" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="200" cy="200" r="120" fill="url(#glow0)"/>
+          
+          <!-- GoChat Logo -->
+          <g transform="translate(200, 200)" class="arch-pulse">
+            <circle r="60" fill="#1a1a2e" stroke="#89b4fa" stroke-width="3"/>
+            <text y="8" text-anchor="middle" font-family="SF Pro Display, PingFang SC, sans-serif" font-size="28" font-weight="900" fill="#89b4fa">Go</text>
+          </g>
+          
+          <!-- Tagline -->
+          <text x="200" y="300" text-anchor="middle" font-family="SF Pro Display, PingFang SC, sans-serif" font-size="16" font-weight="300" fill="#585b70">AI 原生的对话平台</text>
+        </svg>
+      </div>
+      
+      <!-- Stage 1: Architecture Overview -->
+      <div class="arch-stage" id="arch-1">
+        <svg class="arch-svg" viewBox="0 0 500 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- OpenClaw Plugin -->
+          <g id="node-plugin" class="arch-float" transform="translate(60, 160)">
+            <rect x="-50" y="-35" width="100" height="70" rx="12" class="arch-node highlight"/>
+            <text y="-8" class="arch-node-text">OpenClaw</text>
+            <text y="12" class="arch-node-sub">Plugin</text>
+            <g transform="translate(0, -50)" class="arch-icon active">
+              <circle r="6" fill="#a6e3a1"/>
+            </g>
+          </g>
+          
+          <!-- WebSocket Relay -->
+          <g id="node-relay" transform="translate(250, 100)">
+            <rect x="-45" y="-30" width="90" height="60" rx="10" class="arch-node"/>
+            <text y="-5" class="arch-node-text">Relay</text>
+            <text y="12" class="arch-node-sub">WebSocket</text>
+          </g>
+          
+          <!-- GoChat Server -->
+          <g id="node-server" transform="translate(250, 280)">
+            <rect x="-55" y="-40" width="110" height="80" rx="12" class="arch-node highlight"/>
+            <text y="-8" class="arch-node-text">GoChat</text>
+            <text y="12" class="arch-node-sub">Server</text>
+            <g transform="translate(60, -30)" class="arch-icon-green active">
+              <circle r="5" fill="#a6e3a1"/>
+              <text y="20" font-size="9" fill="#a6e3a1" text-anchor="middle">Go</text>
+            </g>
+          </g>
+          
+          <!-- Multi-device clients -->
+          <g id="node-clients" transform="translate(440, 200)">
+            <rect x="-40" y="-60" width="80" height="120" rx="10" class="arch-node"/>
+            <text y="-35" class="arch-node-text">Clients</text>
+            <g transform="translate(0, -10)">
+              <rect x="-25" y="-8" width="50" height="16" rx="4" fill="#313244"/>
+              <rect x="-25" y="12" width="50" height="16" rx="4" fill="#313244"/>
+              <rect x="-25" y="32" width="50" height="16" rx="4" fill="#313244"/>
+            </g>
+          </g>
+          
+          <!-- Connections -->
+          <path d="M115 160 L200 120" class="arch-connection active" marker-end="url(#arrow1)"/>
+          <path d="M250 130 L250 240" class="arch-connection active" marker-end="url(#arrow2)"/>
+          <path d="M310 280 L395 220" class="arch-connection active" marker-end="url(#arrow3)"/>
+          
+          <!-- Arrows -->
+          <defs>
+            <marker id="arrow1" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" class="arch-arrow active"/>
+            </marker>
+            <marker id="arrow2" markerWidth="10" markerHeight="10" refX="3" refY="9" orient="auto">
+              <path d="M0,0 L6,0 L3,9 z" class="arch-arrow active"/>
+            </marker>
+            <marker id="arrow3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" class="arch-arrow active"/>
+            </marker>
+          </defs>
+          
+          <!-- Labels -->
+          <text x="165" y="130" class="arch-label active">Webhook</text>
+          <text x="270" y="200" class="arch-label active">WS</text>
+          <text x="360" y="230" class="arch-label active">Sync</text>
+        </svg>
+      </div>
+      
+      <!-- Stage 2: Core Features -->
+      <div class="arch-stage" id="arch-2">
+        <svg class="arch-svg" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#89b4fa" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#a6e3a1" stop-opacity="0.3"/>
+            </linearGradient>
+          </defs>
+          
+          <!-- Central hub -->
+          <circle cx="200" cy="200" r="80" fill="url(#grad1)" class="arch-pulse"/>
+          <circle cx="200" cy="200" r="80" stroke="#89b4fa" stroke-width="2" fill="none"/>
+          
+          <!-- Feature nodes -->
+          <g id="feat-rt" class="arch-float" style="animation-delay: 0s">
+            <circle cx="200" cy="80" r="35" fill="#1a1a2e" stroke="#a6e3a1" stroke-width="2"/>
+            <text y="5" text-anchor="middle" font-size="11" font-weight="700" fill="#a6e3a1">实时消息</text>
+            <line x1="200" y1="115" x2="200" y2="120" stroke="#a6e3a1" stroke-width="2"/>
+          </g>
+          
+          <g id="feat-plugin" class="arch-float" style="animation-delay: 0.3s">
+            <circle cx="320" cy="200" r="35" fill="#1a1a2e" stroke="#89b4fa" stroke-width="2"/>
+            <text y="5" text-anchor="middle" font-size="11" font-weight="700" fill="#89b4fa">插件系统</text>
+            <line x1="285" y1="200" x2="280" y2="200" stroke="#89b4fa" stroke-width="2"/>
+          </g>
+          
+          <g id="feat-device" class="arch-float" style="animation-delay: 0.6s">
+            <circle cx="200" cy="320" r="35" fill="#1a1a2e" stroke="#f9e2af" stroke-width="2"/>
+            <text y="5" text-anchor="middle" font-size="11" font-weight="700" fill="#f9e2af">多端同步</text>
+            <line x1="200" y1="285" x2="200" y2="280" stroke="#f9e2af" stroke-width="2"/>
+          </g>
+          
+          <g id="feat-ai" class="arch-float" style="animation-delay: 0.9s">
+            <circle cx="80" cy="200" r="35" fill="#1a1a2e" stroke="#f38ba8" stroke-width="2"/>
+            <text y="5" text-anchor="middle" font-size="11" font-weight="700" fill="#f38ba8">AI 集成</text>
+            <line x1="115" y1="200" x2="120" y2="200" stroke="#f38ba8" stroke-width="2"/>
+          </g>
+          
+          <!-- Center text -->
+          <text x="200" y="205" text-anchor="middle" font-family="SF Pro Display, PingFang SC, sans-serif" font-size="20" font-weight="900" fill="#cdd6f4">GoChat</text>
+        </svg>
+      </div>
+      
+      <!-- Stage 3: Connection Modes -->
+      <div class="arch-stage" id="arch-3">
+        <svg class="arch-svg" viewBox="0 0 500 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Relay Mode -->
+          <g transform="translate(100, 150)">
+            <rect x="-70" y="-50" width="140" height="100" rx="12" fill="#1a1a2e" stroke="#89b4fa" stroke-width="2"/>
+            <text y="-20" text-anchor="middle" font-size="14" font-weight="700" fill="#89b4fa">Relay 模式</text>
+            <text y="0" text-anchor="middle" font-size="11" fill="#585b70">通过 GoChat 服务器中转</text>
+            
+            <!-- Flow diagram -->
+            <g transform="translate(0, 30)">
+              <rect x="-40" y="-25" width="30" height="18" rx="4" fill="#313244"/>
+              <path d="M-5 -16 L40 -16" stroke="#a6e3a1" stroke-width="2" marker-end="url(#arrowGreen)"/>
+              <rect x="45" y="-25" width="30" height="18" rx="4" fill="#313244"/>
+              <path d="M60 -16 L60 10" stroke="#a6e3a1" stroke-width="2"/>
+            </g>
+          </g>
+          
+          <!-- Direct Mode -->
+          <g transform="translate(350, 150)">
+            <rect x="-70" y="-50" width="140" height="100" rx="12" fill="#1a1a2e" stroke="#a6e3a1" stroke-width="2"/>
+            <text y="-20" text-anchor="middle" font-size="14" font-weight="700" fill="#a6e3a1">Direct 模式</text>
+            <text y="0" text-anchor="middle" font-size="11" fill="#585b70">插件与客户端直连</text>
+            
+            <!-- Direct connection -->
+            <line x1="-50" y1="30" x2="50" y2="30" stroke="#a6e3a1" stroke-width="3" stroke-dasharray="8 4" class="arch-connection active"/>
+          </g>
+          
+          <!-- VS divider -->
+          <g transform="translate(250, 150)">
+            <text y="5" text-anchor="middle" font-size="24" font-weight="300" fill="#585b70">vs</text>
+          </g>
+          
+          <!-- Arrows -->
+          <defs>
+            <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" fill="#a6e3a1"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+      
+      <!-- Stage 4: Developer Friendly -->
+      <div class="arch-stage" id="arch-4">
+        <svg class="arch-svg" viewBox="0 0 400 350" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Code window -->
+          <rect x="50" y="50" width="300" height="200" rx="12" fill="#12121a" stroke="#313244" stroke-width="2"/>
+          
+          <!-- Window controls -->
+          <circle cx="75" cy="75" r="6" fill="#f38ba8"/>
+          <circle cx="95" cy="75" r="6" fill="#f9e2af"/>
+          <circle cx="115" cy="75" r="6" fill="#a6e3a1"/>
+          
+          <!-- Code lines -->
+          <g font-family="SF Mono, Fira Code, monospace" font-size="12">
+            <text x="70" y="110" fill="#a6e3a1">const</text>
+            <text x="110" y="110" fill="#cdd6f4">ws =</text>
+            <text x="140" y="110" fill="#89b4fa">new</text>
+            <text x="165" y="110" fill="#cdd6f4">WebSocket(</text>
+            <text x="255" y="110" fill="#f9e2af">'wss://...'</text>
+            <text x="320" y="110" fill="#cdd6f4">)</text>
+            
+            <text x="70" y="135" fill="#cdd6f4">ws.</text>
+            <text x="100" y="135" fill="#89b4fa">onmessage</text>
+            <text x="165" y="135" fill="#585b70">=</text>
+            <text x="180" y="135" fill="#cdd6f4">(msg) =&gt; {</text>
+            
+            <text x="70" y="160" fill="#585b70">  // Handle message</text>
+            
+            <text x="70" y="185" fill="#cdd6f4">}</text>
+            
+            <text x="70" y="210" fill="#cdd6f4">ws.</text>
+            <text x="100" y="210" fill="#89b4fa">send</text>
+            <text x="130" y="210" fill="#cdd6f4">(JSON.stringify({</text>
+            
+            <text x="70" y="235" fill="#585b70">  type:</text>
+            <text x="120" y="235" fill="#f9e2af">'message'</text>
+            <text x="175" y="235" fill="#cdd6f4">,</text>
+            
+            <text x="70" y="260" fill="#f9e2af">  text:</text>
+            <text x="115" y="260" fill="#f9e2af">'Hello!'</text>
+            <text x="175" y="260" fill="#cdd6f4">}))</text>
+          </g>
+          
+          <!-- Bottom labels -->
+          <g transform="translate(200, 300)">
+            <g transform="translate(-80, 0)">
+              <rect x="-30" y="-12" width="60" height="24" rx="6" fill="#1a1a2e" stroke="#89b4fa" stroke-width="1"/>
+              <text y="5" text-anchor="middle" font-size="11" font-weight="600" fill="#89b4fa">REST API</text>
+            </g>
+            <g transform="translate(0, 0)">
+              <rect x="-35" y="-12" width="70" height="24" rx="6" fill="#1a1a2e" stroke="#a6e3a1" stroke-width="1"/>
+              <text y="5" text-anchor="middle" font-size="11" font-weight="600" fill="#a6e3a1">WebSocket</text>
+            </g>
+            <g transform="translate(80, 0)">
+              <rect x="-30" y="-12" width="60" height="24" rx="6" fill="#1a1a2e" stroke="#f9e2af" stroke-width="1"/>
+              <text y="5" text-anchor="middle" font-size="11" font-weight="600" fill="#f9e2af">SDK</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+      
+      <!-- Stage 5: Final CTA -->
+      <div class="arch-stage" id="arch-5">
+        <svg class="arch-svg" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="finalGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#89b4fa" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#89b4fa" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          
+          <circle cx="200" cy="200" r="150" fill="url(#finalGlow)"/>
+          
+          <!-- GitHub icon -->
+          <g transform="translate(200, 200)" class="arch-pulse">
+            <path d="M0,-60 C-33,-60 -60,-33 -60,0 C-60,26 -43,48 -17,54 C-13,55 -12,52 -12,49 C-12,45 -13,42 -16,40 C-38,37 -47,26 -47,15 C-47,7 -43,1 -38,-3 C-39,-6 -40,-14 C-40,-25 -34,-30 -26,-29 C-18,-31 -9,-31 0,-29 C9,-31 18,-31 26,-29 C34,-30 40,-25 40,-14 C39,-6 38,-3 C43,1 47,7 47,15 C47,26 38,37 16,40 C13,42 12,45 12,49 C12,52 13,55 17,54 C43,48 60,26 60,0 C60,-33 33,-60 0,-60" 
+                  fill="#1a1a2e" stroke="#89b4fa" stroke-width="3"/>
+          </g>
+          
+          <text x="200" y="280" text-anchor="middle" font-family="SF Pro Display, PingFang SC, sans-serif" font-size="18" font-weight="300" fill="#585b70">github.com/M0Yi/gochat-extension</text>
+          
+          <text x="200" y="310" text-anchor="middle" font-family="SF Pro Display, PingFang SC, sans-serif" font-size="14" font-weight="600" fill="#89b4fa">开始使用 GoChat</text>
+        </svg>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- ========================================
+       RIGHT NARRATIVE PANEL
+       ======================================== -->
+  <div class="narrative-panel">
+    
+    <!-- Hero Section -->
+    <section class="section hero-section visible" id="section-0" data-stage="0">
+      <div class="section-inner">
+        <div class="hero-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          <span>v2026.3.28-plugin.2</span>
+        </div>
+        <h1 class="hero-title">
+          <span class="brand">GoChat</span>
+        </h1>
+        <p class="hero-subtitle">AI 原生的对话平台</p>
+        <div class="hero-cta">
+          <a href="https://github.com/M0Yi/gochat-extension" target="_blank" class="btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405s2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.31 24 12c0-6.63-5.37-12-12-12"/>
+            </svg>
+            <span>查看源码</span>
+          </a>
+          <a href="https://fund.moyi.vip" target="_blank" class="btn-secondary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>在线体验</span>
+          </a>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Architecture Section -->
+    <section class="section" id="section-1" data-stage="1">
+      <div class="section-inner">
+        <span class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18"/>
+            <path d="M9 21V9"/>
+          </svg>
+          架构概览
+        </span>
+        <h2 class="section-title">
+          从插件到客户端<br>
+          <span class="highlight">全链路连接</span>
+        </h2>
+        <p class="section-body">
+          GoChat 采用三层架构设计。OpenClaw 插件捕获 AI 对话，通过 WebSocket Relay 实时推送到 GoChat 服务器，再由服务器分发给多个客户端设备。每一步都可观测、可控、可扩展。
+        </p>
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>OpenClaw 插件</h4>
+              <p>原生集成，自动捕获 Claude、GPT 等 AI 助手的对话内容</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>WebSocket Relay</h4>
+              <p>低延迟消息中继，支持断线重连与消息队列</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Core Features Section -->
+    <section class="section" id="section-2" data-stage="2">
+      <div class="section-inner">
+        <span class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          核心能力
+        </span>
+        <h2 class="section-title">
+          为 AI 对话<br>
+          <span class="highlight">量身打造</span>
+        </h2>
+        <p class="section-body">
+          不仅仅是消息转发。GoChat 理解 AI 对话的特殊需求——长文本、代码块、Markdown 格式、多轮上下文。每一个细节都经过精心设计。
+        </p>
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>实时消息同步</h4>
+              <p>毫秒级延迟，多设备间消息即时同步</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14.7 6.3a1 1 0 0 0 1.7 4.3 2 2 0 0 0 4.6 1 1 0 0 0-1.7 4.3-2 2 0 0 0 4.6-1 1 0 0 0 1.7-4.3 2-2 0 0 0-4.6 1-1 0 0 0 4.3 2 2 0 0 0 1.7 4.3 1.7 2 0 0 0 4.6-1 1 0 0 0-4.3-2-2 0 0 0-4.6-1-1 0 0 0 1.7-4.3"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>插件生态</h4>
+              <p>开放 API，支持自定义插件扩展功能</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="5" y="2" width="14" height="20" rx="2"/>
+                <line x1="12" y1="18" x2="12.01" y2="18"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>多端支持</h4>
+              <p>Web、桌面、移动端，随时随地访问对话</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 1 0 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/>
+                <path d="M8 14s1.5 2 4 2 4-2"/>
+                <line x1="9" y1="9" x2="9.01" y2="9"/>
+                <line x1="15" y1="9" x2="15.01" y2="9"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>AI Agent 集成</h4>
+              <p>原生支持多 Agent 协作与任务管理</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Connection Modes Section -->
+    <section class="section" id="section-3" data-stage="3">
+      <div class="section-inner">
+        <span class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          连接方式
+        </span>
+        <h2 class="section-title">
+          两种模式<br>
+          <span class="highlight">灵活部署</span>
+        </h2>
+        <p class="section-body">
+          根据你的网络环境和安全需求，选择最适合的连接模式。
+        </p>
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>Relay 模式</h4>
+              <p>所有消息通过 GoChat 服务器中转。适合需要服务器端管理和多端同步的场景。</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>Direct 模式</h4>
+              <p>OpenClaw 插件与客户端直接建立 WebSocket 连接。适合内网环境或对延迟敏感的场景。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Developer Section -->
+    <section class="section" id="section-4" data-stage="4">
+      <div class="section-inner">
+        <span class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          开发者友好
+        </span>
+        <h2 class="section-title">
+          简洁的<br>
+          <span class="highlight">开发体验</span>
+        </h2>
+        <p class="section-body">
+          清晰的 API 设计，完善的文档。无论是构建自定义客户端、集成第三方服务，还是扩展插件功能，GoChat 都让一切变得简单。
+        </p>
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>REST API</h4>
+              <p>标准的 HTTP 接口，支持所有主流编程语言</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>WebSocket</h4>
+              <p>实时双向通信，适合构建响应式应用</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>Plugin SDK</h4>
+              <p>TypeScript SDK，快速构建 OpenClaw 插件</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- CTA Section -->
+    <section class="section" id="section-5" data-stage="5">
+      <div class="section-inner">
+        <span class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.04-8.54"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          开始使用
+        </span>
+        <h2 class="section-title">
+          几分钟内<br>
+          <span class="highlight">完成部署</span>
+        </h2>
+        <p class="section-body">
+          安装 OpenClaw 插件，配置 GoChat 服务器地址，即刻开始使用。无需复杂的配置流程，没有额外的依赖安装。
+        </p>
+        <div class="hero-cta" style="justify-content: flex-start;">
+          <a href="https://github.com/M0Yi/gochat-extension" target="_blank" class="btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405s2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.31 24 12c0-6.63-5.37-12-12-12"/>
+            </svg>
+            <span>GitHub 仓库</span>
+          </a>
+          <a href="https://fund.moyi.vip/admin" target="_blank" class="btn-secondary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18"/>
+              <path d="M9 21V9"/>
+            </svg>
+            <span>管理后台</span>
+          </a>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="https://github.com/M0Yi/gochat-extension" target="_blank">GitHub</a>
+          <a href="https://fund.moyi.vip" target="_blank">在线演示</a>
+          <a href="https://fund.moyi.vip/admin" target="_blank">管理后台</a>
+        </div>
+        <div class="footer-version">v2026.3.28-plugin.2</div>
+        <div class="footer-copyright">© 2026 GoChat. Built with OpenClaw.</div>
+      </div>
+    </footer>
+    
+  </div>
+</div>
+
+<script>
+// ========================================
+// SCROLL-TRIGGERED ANIMATIONS
+// ========================================
+
+(function() {
+  'use strict';
+  
+  // Configuration
+  const CONFIG = {
+    transitionDuration: 500,
+    threshold: 0.4,
+    rootMargin: '-10% 0px -10% 0px'
+  };
+  
+  // Cache DOM elements
+  const sections = document.querySelectorAll('.section');
+  const archStages = document.querySelectorAll('.arch-stage');
+  
+  // Current active stage
+  let currentStage = 0;
+  
+  // Intersection Observer for sections
+  const sectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        
+        // Update architecture stage
+        const stageIndex = parseInt(entry.target.dataset.stage);
+        if (!isNaN(stageIndex) && stageIndex !== currentStage) {
+          updateArchitectureStage(stageIndex);
+          currentStage = stageIndex;
+        }
+      }
+    });
+  }, {
+    threshold: CONFIG.threshold,
+    rootMargin: CONFIG.rootMargin
+  });
+  
+  // Observe all sections
+  sections.forEach(section => {
+    sectionObserver.observe(section);
+  });
+  
+  // Update architecture visualization stage
+  function updateArchitectureStage(newStage) {
+    archStages.forEach((stage, index) => {
+      if (index === newStage) {
+        stage.classList.remove('exit');
+        stage.classList.add('active');
+      } else if (index < newStage) {
+        stage.classList.remove('active');
+        stage.classList.add('exit');
+      } else {
+        stage.classList.remove('active', 'exit');
+      }
+    });
+  }
+  
+  // Smooth scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    });
+  });
+  
+  // Parallax effect on scroll (subtle)
+  let ticking = false;
+  
+  function updateParallax() {
+    const scrollY = window.scrollY;
+    const stickyPanel = document.querySelector('.sticky-content');
+    
+    if (stickyPanel && window.innerWidth > 1024) {
+      const offset = scrollY * 0.05;
+      stickyPanel.style.transform = `translateY(${offset}px)`;
+    }
+    
+    ticking = false;
+  }
+  
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(updateParallax);
+      ticking = true;
+    }
+  }, { passive: true });
+  
+  // Handle resize
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      // Reset parallax on resize
+      const stickyPanel = document.querySelector('.sticky-content');
+      if (stickyPanel) {
+        stickyPanel.style.transform = '';
+      }
+    }, 250);
+  });
+  
+  // Initial visibility check
+  setTimeout(() => {
+    const firstSection = document.getElementById('section-0');
+    if (firstSection) {
+      firstSection.classList.add('visible');
+    }
+  }, 100);
+  
+})();
+</script>
+</body>
+</html>

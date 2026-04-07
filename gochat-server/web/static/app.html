@@ -1,0 +1,2875 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GoChat</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-base:#0f0f17;
+  --bg-surface:#1a1a2e;
+  --bg-overlay:#1e1e2e;
+  --text-primary:#cdd6f4;
+  --text-muted:#585b70;
+  --accent-blue:#89b4fa;
+  --accent-blue-hover:#74c7ec;
+  --accent-green:#a6e3a1;
+  --accent-red:#f38ba8;
+  --border:#313244;
+}
+body{
+  font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg-base);
+  color:var(--text-primary);
+  height:100vh;
+  overflow:hidden;
+}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg-base)}
+::-webkit-scrollbar-thumb{background:#313244;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#45475a}
+
+/* Login Screen */
+.login-wrap{
+  width:100%;
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(135deg,var(--bg-base) 0%,var(--bg-surface) 100%);
+}
+.login-box{
+  background:var(--bg-surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:40px;
+  width:420px;
+  max-width:90vw;
+  text-align:center;
+}
+.login-box h1{
+  font-size:28px;
+  margin-bottom:8px;
+  color:var(--accent-blue);
+  font-weight:700;
+  letter-spacing:-0.5px;
+}
+.login-box .subtitle{
+  font-size:14px;
+  color:var(--text-muted);
+  margin-bottom:32px;
+}
+.login-box input{
+  width:100%;
+  padding:14px 16px;
+  background:var(--bg-base);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text-primary);
+  font-size:14px;
+  outline:none;
+  margin-bottom:12px;
+  transition:border-color .2s;
+}
+.login-box input:focus{
+  border-color:var(--accent-blue);
+}
+.login-box input::placeholder{
+  color:var(--text-muted);
+}
+.login-box button{
+  width:100%;
+  padding:14px;
+  background:var(--accent-blue);
+  color:var(--bg-base);
+  border:none;
+  border-radius:8px;
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  transition:background .2s,opacity .2s;
+  margin-top:8px;
+}
+.login-box button:hover{
+  background:var(--accent-blue-hover);
+}
+.login-box button:disabled{
+  opacity:0.6;
+  cursor:not-allowed;
+}
+.pair-panel{
+  background:rgba(137,180,250,.08);
+  border:1px solid rgba(137,180,250,.18);
+  border-radius:12px;
+  padding:18px 16px 16px;
+  margin-bottom:20px;
+}
+.pair-panel h2{
+  font-size:15px;
+  color:var(--text-primary);
+  margin-bottom:8px;
+}
+.pair-code{
+  font-size:32px;
+  line-height:1;
+  letter-spacing:8px;
+  font-weight:700;
+  color:var(--accent-green);
+  margin:14px 0 10px;
+}
+.pair-status{
+  font-size:13px;
+  line-height:1.5;
+  color:var(--text-muted);
+  min-height:40px;
+  margin-bottom:14px;
+}
+.pair-status.error{
+  color:var(--accent-red);
+}
+.install-command{
+  width:100%;
+  min-height:86px;
+  resize:none;
+  padding:12px 14px;
+  background:var(--bg-base);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text-primary);
+  font-size:12px;
+  line-height:1.5;
+  outline:none;
+  margin:0 0 10px;
+}
+.install-command:focus{
+  border-color:var(--accent-blue);
+}
+.install-tabs{
+  display:flex;
+  gap:0;
+  margin-bottom:0;
+}
+.install-tab{
+  flex:1;
+  padding:8px 0;
+  text-align:center;
+  font-size:12px;
+  font-weight:500;
+  cursor:pointer;
+  background:var(--bg-base);
+  color:var(--text-muted);
+  border:1px solid var(--border);
+  border-bottom:none;
+  transition:all .15s;
+  user-select:none;
+}
+.install-tab:first-child{
+  border-radius:8px 0 0 0;
+  border-right:none;
+}
+.install-tab:last-child{
+  border-radius:0 8px 0 0;
+}
+.install-tab.active{
+  background:var(--bg-overlay);
+  color:var(--accent-blue);
+  border-color:var(--accent-blue);
+}
+.install-tab:hover:not(.active){
+  background:rgba(137,180,250,.06);
+  color:var(--text-primary);
+}
+.install-command-wrap .install-command{
+  border-radius:0 0 8px 8px;
+  margin-bottom:10px;
+}
+.install-tab-icon{
+  font-size:11px;
+  margin-right:4px;
+}
+.secondary-btn{
+  background:transparent !important;
+  color:var(--accent-blue) !important;
+  border:1px solid rgba(137,180,250,.35) !important;
+}
+.secondary-btn:hover{
+  background:rgba(137,180,250,.1) !important;
+}
+.login-divider{
+  position:relative;
+  margin:18px 0 14px;
+  text-align:center;
+}
+.login-divider:before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  height:1px;
+  background:var(--border);
+}
+.login-divider span{
+  position:relative;
+  display:inline-block;
+  padding:0 10px;
+  background:var(--bg-surface);
+  color:var(--text-muted);
+  font-size:12px;
+}
+.login-error{
+  color:var(--accent-red);
+  font-size:13px;
+  margin-top:12px;
+  display:none;
+  text-align:center;
+}
+.login-footer{
+  margin-top:24px;
+  font-size:12px;
+  color:var(--text-muted);
+}
+
+/* Chat Screen */
+.chat-wrap{
+  display:none;
+  flex-direction:column;
+  height:100vh;
+}
+.chat-wrap.active{
+  display:flex;
+}
+
+/* Header */
+.chat-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 20px;
+  background:var(--bg-surface);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.channel-name{
+  font-size:16px;
+  font-weight:600;
+  color:var(--text-primary);
+}
+.status-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--accent-green);
+  flex-shrink:0;
+}
+.status-dot.disconnected{
+  background:var(--accent-red);
+}
+.status-dot.connecting{
+  background:#f9e2af;
+  animation:pulse-dot 1.5s infinite;
+}
+@keyframes pulse-dot{
+  0%,100%{opacity:1}
+  50%{opacity:.4}
+}
+.status-text{
+  font-size:12px;
+  color:var(--text-muted);
+}
+.header-center{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.plugin-status{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+}
+.status-badge{
+  padding:2px 8px;
+  border-radius:10px;
+  font-size:11px;
+  font-weight:500;
+}
+.status-badge.idle{
+  background:rgba(166,227,161,0.15);
+  color:var(--accent-green);
+}
+.status-badge.working{
+  background:rgba(249,226,175,0.15);
+  color:#f9e2af;
+  animation:pulse-badge 1s infinite;
+}
+.status-badge.syncing{
+  background:rgba(137,180,250,0.15);
+  color:var(--accent-blue);
+}
+.status-badge.error,
+.status-badge.offline{
+  background:rgba(243,139,168,0.15);
+  color:var(--accent-red);
+}
+@keyframes pulse-badge{
+  0%,100%{opacity:1}
+  50%{opacity:.7}
+}
+.agent-count{
+  color:var(--text-muted);
+  font-size:12px;
+}
+.agent-count::before{
+  content:"🤖 ";
+}
+.header-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.btn-logout{
+  padding:8px 16px;
+  background:transparent;
+  color:var(--text-muted);
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-size:13px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.btn-logout:hover{
+  background:var(--accent-red);
+  color:#fff;
+  border-color:var(--accent-red);
+}
+.btn-office-toggle{
+  padding:8px 12px;
+  background:transparent;
+  color:var(--text-muted);
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-size:14px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.btn-office-toggle:hover{
+  background:var(--accent-blue);
+  color:#fff;
+  border-color:var(--accent-blue);
+}
+.btn-office-toggle.active{
+  background:var(--accent-blue);
+  color:#fff;
+  border-color:var(--accent-blue);
+}
+
+/* Floating Mini Office */
+.mini-office-float{
+  display:none;
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  width:min(560px,calc(100vw - 24px));
+  background:var(--bg-surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+  z-index:1000;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  image-rendering:pixelated;
+}
+.mini-office-float.show{
+  display:block;
+}
+.mini-office-titlebar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px;
+  background:var(--bg-overlay);
+  border-bottom:1px solid var(--border);
+  cursor:move;
+  user-select:none;
+}
+.mini-office-titlebar span:first-child{
+  font-size:14px;
+  color:var(--accent-blue);
+  font-weight:600;
+}
+.mini-office-status{
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:8px;
+  background:rgba(166,227,161,0.15);
+  color:var(--accent-green);
+}
+.mini-office-status.working{
+  background:rgba(249,226,175,0.15);
+  color:#f9e2af;
+  animation:pulse-badge 1s infinite;
+}
+.mini-office-status.syncing{
+  background:rgba(137,180,250,0.15);
+  color:var(--accent-blue);
+}
+.mini-office-status.error{
+  background:rgba(243,139,168,0.15);
+  color:var(--accent-red);
+}
+.mini-office-status.offline{
+  background:rgba(239,68,68,0.15);
+  color:var(--accent-red);
+}
+.mini-office-close{
+  background:none;
+  border:none;
+  color:var(--text-muted);
+  font-size:20px;
+  cursor:pointer;
+  padding:0 4px;
+}
+.mini-office-close:hover{
+  color:var(--accent-red);
+}
+.mini-office-scene{
+  position:relative;
+  width:100%;
+  aspect-ratio:16/9;
+  background:#1a2232;
+  overflow:hidden;
+}
+.mini-office-stage{
+  position:absolute;
+  left:0;
+  top:0;
+  width:1280px;
+  height:720px;
+  transform-origin:top left;
+  image-rendering:pixelated;
+}
+.mini-office-bg{
+  position:absolute;
+  inset:0;
+  width:1280px;
+  height:720px;
+  display:block;
+  image-rendering:pixelated;
+}
+.mini-office-prop,
+.mini-office-actor{
+  position:absolute;
+  display:block;
+  pointer-events:none;
+  image-rendering:pixelated;
+}
+.mini-office-prop-sofa{
+  left:140px;
+  top:348px;
+  width:256px;
+  height:256px;
+  z-index:2;
+  filter:drop-shadow(0 6px 0 rgba(10,16,24,0.18));
+}
+.mini-office-prop.hidden{
+  opacity:0;
+}
+.mini-office-prop-desk{
+  left:938px;
+  top:446px;
+  width:276px;
+  height:214px;
+  z-index:5;
+  filter:drop-shadow(0 6px 0 rgba(10,16,24,0.22));
+}
+.mini-office-actor{
+  opacity:0;
+  transition:opacity .18s steps(2,end);
+}
+.mini-office-actor.visible{
+  opacity:1;
+}
+.mini-office-actor-idle{
+  left:142px;
+  top:350px;
+  width:256px;
+  height:256px;
+  z-index:3;
+}
+.mini-office-actor-working{
+  left:968px;
+  top:404px;
+  width:176px;
+  height:176px;
+  z-index:4;
+}
+.mini-office-actor canvas{
+  width:100%;
+  height:100%;
+  display:block;
+  image-rendering:pixelated;
+}
+.mini-office-footer{
+  padding:10px 14px;
+  background:var(--bg-overlay);
+  border-top:1px solid var(--border);
+}
+.mini-office-detail{
+  font-size:12px;
+  color:var(--text-muted);
+  display:block;
+}
+
+/* Messages Area */
+.messages-wrap{
+  flex:1;
+  overflow-y:auto;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.messages-empty{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  color:var(--text-muted);
+  font-size:14px;
+  text-align:center;
+  gap:8px;
+}
+.messages-empty svg{
+  width:48px;
+  height:48px;
+  opacity:0.4;
+}
+
+.message{
+  max-width:75%;
+  padding:12px 16px;
+  border-radius:16px;
+  font-size:14px;
+  line-height:1.5;
+  word-break:break-word;
+  position:relative;
+}
+.message-user{
+  background:var(--accent-blue);
+  color:#fff;
+  align-self:flex-end;
+  border-bottom-right-radius:4px;
+}
+.message-ai{
+  background:var(--bg-surface);
+  color:var(--text-primary);
+  align-self:flex-start;
+  border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+}
+.message-attachment{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:8px 12px;
+  background:rgba(0,0,0,0.2);
+  border-radius:6px;
+  margin-bottom:8px;
+  font-size:12px;
+}
+.message-attachment svg{
+  width:14px;
+  height:14px;
+  flex-shrink:0;
+}
+.message-text{
+  white-space:pre-wrap;
+}
+.message.message-streaming .message-text::after{
+  content:"";
+  display:inline-block;
+  width:7px;
+  height:1em;
+  margin-left:2px;
+  vertical-align:-2px;
+  background:currentColor;
+  opacity:.45;
+  animation:message-caret 1s steps(1,end) infinite;
+}
+.message-meta{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-top:6px;
+  font-size:11px;
+  opacity:0.7;
+  font-family:monospace;
+}
+.message-user .message-meta{
+  justify-content:flex-end;
+}
+@keyframes message-caret{
+  0%,49%{opacity:.45}
+  50%,100%{opacity:0}
+}
+
+/* Input Area */
+.input-wrap{
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  padding:12px 16px;
+  background:var(--bg-surface);
+  border-top:1px solid var(--border);
+  flex-shrink:0;
+}
+.input-actions{
+  display:flex;
+  gap:4px;
+  flex-shrink:0;
+}
+.btn-icon{
+  width:40px;
+  height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text-muted);
+  cursor:pointer;
+  transition:all .15s;
+}
+.btn-icon:hover{
+  background:var(--bg-overlay);
+  color:var(--text-primary);
+}
+.btn-icon.recording{
+    background-color:#ef4444;
+    border-color:#ef4444;
+    color:#fff;
+    animation:pulse-rec 1s infinite;
+}
+.btn-icon.transcribing{
+    background-color:#3b82f6;
+    border-color:#3b82f6;
+    color:#fff;
+    pointer-events:none;
+    animation:pulse-rec 1.5s infinite;
+}
+@keyframes pulse-rec{
+    0%,100%{opacity:1}
+    50%{opacity:.6}
+}
+@keyframes rec-pulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.05)}
+}
+.btn-icon svg{
+  width:18px;
+  height:18px;
+}
+.input-field{
+  flex:1;
+  position:relative;
+}
+.audio-mode-bar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:8px;
+}
+.audio-mode-btn{
+  padding:6px 10px;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:999px;
+  color:var(--text-muted);
+  font-size:12px;
+  line-height:1;
+  cursor:pointer;
+  transition:all .15s;
+}
+.audio-mode-btn:hover{
+  color:var(--text-primary);
+  border-color:rgba(137,180,250,.45);
+}
+.audio-mode-btn.active{
+  background:rgba(137,180,250,.12);
+  border-color:rgba(137,180,250,.55);
+  color:var(--accent-blue);
+}
+.audio-mode-hint{
+  font-size:12px;
+  color:var(--text-muted);
+}
+.stt-live-bar{
+  display:none;
+  align-items:flex-start;
+  gap:8px;
+  padding:9px 12px;
+  margin-bottom:8px;
+  background:rgba(166,227,161,.08);
+  border:1px solid rgba(166,227,161,.18);
+  border-radius:10px;
+}
+.stt-live-bar.show{
+  display:flex;
+}
+.stt-live-label{
+  flex-shrink:0;
+  font-size:11px;
+  color:var(--accent-green);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.stt-live-text{
+  font-size:13px;
+  color:var(--text-primary);
+  line-height:1.4;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.input-textarea{
+  width:100%;
+  padding:10px 14px;
+  background:var(--bg-base);
+  border:1px solid var(--border);
+  border-radius:12px;
+  color:var(--text-primary);
+  font-size:14px;
+  font-family:inherit;
+  outline:none;
+  resize:none;
+  min-height:42px;
+  max-height:96px;
+  line-height:1.4;
+  transition:border-color .2s;
+}
+.input-textarea:focus{
+  border-color:var(--accent-blue);
+}
+.input-textarea::placeholder{
+  color:var(--text-muted);
+}
+.btn-send{
+  width:42px;
+  height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--accent-blue);
+  border:none;
+  border-radius:10px;
+  color:#fff;
+  cursor:pointer;
+  transition:all .15s;
+  flex-shrink:0;
+}
+.btn-send:hover:not(:disabled){
+  background:var(--accent-blue-hover);
+}
+.btn-send:disabled{
+  opacity:0.4;
+  cursor:not-allowed;
+}
+.btn-send svg{
+  width:18px;
+  height:18px;
+}
+
+/* File input hidden */
+.file-input{
+  display:none;
+}
+
+/* Attachment preview */
+.attachment-preview{
+  display:none;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  background:var(--bg-overlay);
+  border-radius:8px;
+  margin-bottom:8px;
+  font-size:12px;
+  color:var(--text-primary);
+}
+.attachment-preview.show{
+  display:flex;
+}
+.attachment-preview svg{
+  width:16px;
+  height:16px;
+  color:var(--accent-blue);
+}
+.attachment-preview .remove-attach{
+  margin-left:auto;
+  background:none;
+  border:none;
+  color:var(--text-muted);
+  cursor:pointer;
+  padding:4px;
+}
+.attachment-preview .remove-attach:hover{
+  color:var(--accent-red);
+}
+
+/* Reconnecting banner */
+.reconnect-banner{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:8px;
+  background:rgba(249,226,175,0.1);
+  border-bottom:1px solid rgba(249,226,175,0.3);
+  color:#f9e2af;
+  font-size:12px;
+}
+.reconnect-banner.show{
+  display:flex;
+}
+.reconnect-banner svg{
+  width:14px;
+  height:14px;
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{
+  from{transform:rotate(0deg)}
+  to{transform:rotate(360deg)}
+}
+
+/* Responsive */
+@media(max-width:480px){
+  .login-box{
+    padding:28px 24px;
+  }
+  .login-box h1{
+    font-size:24px;
+  }
+  .pair-code{
+    font-size:28px;
+    letter-spacing:6px;
+  }
+  .chat-header{
+    padding:12px 16px;
+  }
+  .channel-name{
+    font-size:15px;
+  }
+  .messages-wrap{
+    padding:12px;
+  }
+  .message{
+    max-width:85%;
+    padding:10px 14px;
+  }
+  .input-wrap{
+    padding:10px 12px;
+  }
+  .audio-mode-bar{
+    gap:6px;
+  }
+  .audio-mode-hint{
+    width:100%;
+  }
+  .btn-icon{
+    width:36px;
+    height:36px;
+  }
+  .btn-send{
+    width:38px;
+    height:38px;
+  }
+  .mini-office-float{
+    right:12px;
+    bottom:12px;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen" class="login-wrap">
+  <div class="login-box">
+    <h1>GoChat</h1>
+    <p class="subtitle">连接你的 AI 助手</p>
+    <div class="pair-panel" id="pairPanel">
+      <h2>验证码连接</h2>
+      <div class="pair-code" id="pairCodeDisplay">------</div>
+      <div class="pair-status" id="pairStatus">正在准备连接码...</div>
+      <div class="install-tabs">
+        <div class="install-tab active" onclick="switchInstallTab('unix')" id="tabUnix"><span class="install-tab-icon">🍎</span>macOS / Linux</div>
+        <div class="install-tab" onclick="switchInstallTab('windowsPowershell')" id="tabWindowsPowershell"><span class="install-tab-icon">🪟</span>Windows (PowerShell)</div>
+      </div>
+      <div class="install-command-wrap">
+        <textarea id="installCommandInput" class="install-command" readonly placeholder="安装命令会显示在这里"></textarea>
+      </div>
+      <button id="pairStartBtn" class="secondary-btn" onclick="startPairFlow()">刷新连接码</button>
+      <button id="copyInstallCommandBtn" class="secondary-btn" onclick="copyInstallCommand()">复制安装命令</button>
+    </div>
+    <div class="login-divider"><span>或手动输入凭证</span></div>
+    <input type="text" id="channelIdInput" placeholder="渠道 ID" autocomplete="off">
+    <input type="password" id="secretInput" placeholder="密钥" autocomplete="off">
+    <button id="loginBtn" onclick="doLogin()">连接</button>
+    <div class="login-error" id="loginError"></div>
+    <p class="login-footer">推荐直接使用上方 6 位连接码，手动凭证仅作为备用入口。</p>
+  </div>
+</div>
+
+<!-- Chat Screen -->
+<div id="chatScreen" class="chat-wrap">
+  <!-- Reconnect Banner -->
+  <div class="reconnect-banner" id="reconnectBanner">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+    </svg>
+    <span>连接断开，正在重连...</span>
+  </div>
+   
+  <!-- Header -->
+  <div class="chat-header">
+    <div class="header-left">
+      <div class="status-dot" id="statusDot"></div>
+      <div>
+        <div class="channel-name" id="channelNameDisplay">-</div>
+        <div class="status-text" id="statusText">已连接</div>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="plugin-status" id="pluginStatus">
+        <span class="status-badge" id="workStatusBadge">-</span>
+        <span class="agent-count" id="agentCountDisplay">-</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="btn-office-toggle active" id="btnOfficeToggle" onclick="toggleMiniOffice()">🏢</button>
+      <button class="btn-logout" onclick="doLogout()">退出</button>
+    </div>
+  </div>
+  
+  <!-- Floating Mini Office -->
+  <div class="mini-office-float show" id="miniOfficeFloat">
+    <div class="mini-office-titlebar" id="miniOfficeTitlebar">
+      <span>⭐ 像素办公室</span>
+      <span class="mini-office-status" id="miniOfficeStatus">-</span>
+      <button class="mini-office-close" onclick="toggleMiniOffice()">×</button>
+    </div>
+    <div class="mini-office-scene" id="miniOfficeScene">
+      <div class="mini-office-stage" id="miniOfficeStage">
+        <img class="mini-office-bg" src="/static/office_bg_small.webp" alt="">
+        <img id="miniOfficeSofa" class="mini-office-prop mini-office-prop-sofa" src="/static/sofa-idle-v3.png" alt="">
+        <div id="miniOfficeStarIdleCanvasWrap" class="mini-office-actor mini-office-actor-idle">
+          <canvas id="miniOfficeStarIdleCanvas" width="256" height="256"></canvas>
+        </div>
+        <div id="miniOfficeStarWorkingCanvasWrap" class="mini-office-actor mini-office-actor-working">
+          <canvas id="miniOfficeStarWorkingCanvas" width="176" height="176"></canvas>
+        </div>
+        <img id="miniOfficeDesk" class="mini-office-prop mini-office-prop-desk" src="/static/desk-v3.webp" alt="">
+      </div>
+    </div>
+    <div class="mini-office-footer">
+      <span class="mini-office-detail" id="miniOfficeDetail">-</span>
+    </div>
+  </div>
+  
+  <!-- Messages -->
+  <div class="messages-wrap" id="messagesWrap">
+    <div class="messages-empty" id="emptyState">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span>发送消息开始与 AI 对话</span>
+    </div>
+  </div>
+  
+  <!-- Input Area -->
+  <div class="input-wrap">
+    <div class="input-actions">
+      <input type="file" id="fileInput" class="file-input" onchange="handleFileSelect(event)">
+      <button class="btn-icon" onclick="document.getElementById('fileInput').click()" title="附件">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <button class="btn-icon" id="recordBtn" onclick="toggleRecording()" title="录音">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-field">
+      <div class="attachment-preview" id="attachmentPreview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+          <polyline points="13 2 13 9 20 9"/>
+        </svg>
+        <span id="attachmentName">file.png</span>
+        <button class="remove-attach" onclick="clearAttachment()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="audio-mode-bar" id="audioModeBar">
+        <button class="audio-mode-btn" id="audioModeOfflineBtn" onclick="setAudioMode('offline')">离线整段</button>
+        <button class="audio-mode-btn" id="audioMode2PassBtn" onclick="setAudioMode('2pass')">实时字幕</button>
+        <button class="audio-mode-btn" id="audioModeDirectBtn" onclick="setAudioMode('direct')">录音直发</button>
+        <span class="audio-mode-hint" id="audioModeHint">松开后返回整段转写</span>
+      </div>
+      <div class="stt-live-bar" id="sttLiveBar">
+        <span class="stt-live-label" id="sttLiveLabel">实时字幕</span>
+        <span class="stt-live-text" id="sttLiveText"></span>
+      </div>
+      <textarea class="input-textarea" id="messageInput" placeholder="输入消息..." rows="1" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+    </div>
+    <button class="btn-send" id="sendBtn" onclick="sendMessage()" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var INSTALL_TAB_CONFIGS = {
+    unix: {
+      responseKey: 'installCommand',
+      label: 'macOS / Linux 安装命令'
+    },
+    windowsPowershell: {
+      responseKey: 'installCommandWindows',
+      label: 'Windows (PowerShell) 安装命令'
+    }
+  };
+
+  function clearLegacyPairStorage() {
+    localStorage.removeItem('gochat_pair_session_token');
+    localStorage.removeItem('gochat_pair_code');
+    localStorage.removeItem('gochat_pair_install_command');
+    localStorage.removeItem('gochat_pair_install_command_windows');
+    localStorage.removeItem('gochat_pair_install_command_windows_powershell');
+  }
+
+  clearLegacyPairStorage();
+
+  // State
+  var token = localStorage.getItem('gochat_chat_token');
+  var channelId = localStorage.getItem('gochat_chat_channelId');
+  var channelName = localStorage.getItem('gochat_chat_channelName');
+  var pairSessionToken = null;
+  var pairCode = null;
+  var pairInstallCommands = {
+    unix: '',
+    windowsPowershell: ''
+  };
+  var activeInstallTab = 'unix';
+  var ws = null;
+  var reconnectTimer = null;
+  var pairPollTimer = null;
+  var selectedFile = null;
+  var mediaRecorder = null;
+  var audioChunks = [];
+  var isRecording = false;
+  var audioContext = null;
+  var audioStream = null;
+  var scriptProcessor = null;
+  var audioEncoder = null;
+  var isStreaming = false;
+  var isTranscribing = false;
+  var audioMode = localStorage.getItem('gochat_chat_audio_mode') || 'offline';
+  var streamingTimerInterval = null;
+  var streamingSeconds = 0;
+  var streamingSampleRate = 16000;
+  var streamingChannels = 1;
+  var streamingFrameSize = 0;
+  var streamingPCMBuffer = new Float32Array(0);
+  var streamingSamplesSent = 0;
+  var streamingPCMChunks = [];
+  var streamingPCMTotalSamples = 0;
+  var streamingFormat = 'opus';
+  var streamingSTTMode = 'offline';
+  var streamingFrameDuration = 20;
+  var pendingStreamingAudioAttachment = null;
+  var aiStreamingMessages = Object.create(null);
+
+  // DOM Elements
+  var loginScreen = document.getElementById('loginScreen');
+  var chatScreen = document.getElementById('chatScreen');
+  var loginBtn = document.getElementById('loginBtn');
+  var loginError = document.getElementById('loginError');
+  var pairPanel = document.getElementById('pairPanel');
+  var channelIdInput = document.getElementById('channelIdInput');
+  var secretInput = document.getElementById('secretInput');
+  var pairCodeDisplay = document.getElementById('pairCodeDisplay');
+  var pairStatus = document.getElementById('pairStatus');
+  var pairStartBtn = document.getElementById('pairStartBtn');
+  var installCommandInput = document.getElementById('installCommandInput');
+  var statusDot = document.getElementById('statusDot');
+  var statusText = document.getElementById('statusText');
+  var channelNameDisplay = document.getElementById('channelNameDisplay');
+  var messagesWrap = document.getElementById('messagesWrap');
+  var emptyState = document.getElementById('emptyState');
+  var messageInput = document.getElementById('messageInput');
+  var sendBtn = document.getElementById('sendBtn');
+  var fileInput = document.getElementById('fileInput');
+  var attachmentPreview = document.getElementById('attachmentPreview');
+  var attachmentName = document.getElementById('attachmentName');
+  var audioModeOfflineBtn = document.getElementById('audioModeOfflineBtn');
+  var audioMode2PassBtn = document.getElementById('audioMode2PassBtn');
+  var audioModeDirectBtn = document.getElementById('audioModeDirectBtn');
+  var audioModeHint = document.getElementById('audioModeHint');
+  var sttLiveBar = document.getElementById('sttLiveBar');
+  var sttLiveLabel = document.getElementById('sttLiveLabel');
+  var sttLiveText = document.getElementById('sttLiveText');
+  var recordBtn = document.getElementById('recordBtn');
+  var reconnectBanner = document.getElementById('reconnectBanner');
+
+  // Initialize
+  messageInput.addEventListener('input', updateSendButton);
+  renderAudioMode();
+
+  // Pre-fill channelId from URL parameter
+  var urlParams = new URLSearchParams(window.location.search);
+  var urlChannelId = urlParams.get('channelId');
+  if (urlChannelId) {
+    // URL specifies a different channel — clear stale session, force re-login
+    if (channelId && channelId !== urlChannelId) {
+      token = null;
+      channelId = null;
+      channelName = null;
+      localStorage.removeItem('gochat_chat_token');
+      localStorage.removeItem('gochat_chat_channelId');
+      localStorage.removeItem('gochat_chat_channelName');
+    }
+    channelIdInput.value = urlChannelId;
+    pairPanel.style.display = 'none';
+  }
+  renderActiveInstallCommand();
+
+  function parseJSONResponse(res) {
+    return res.text().then(function(text) {
+      var data = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = {};
+        }
+      }
+      if (!res.ok) {
+        var err = new Error(data.error || '请求失败');
+        err.status = res.status;
+        throw err;
+      }
+      return data;
+    });
+  }
+
+  function clearSessionState(options) {
+    var opts = options || {};
+    var preservedChannelId = opts.keepChannelId ? (channelIdInput.value.trim() || channelId || urlChannelId || '') : '';
+
+    token = null;
+    channelName = null;
+    localStorage.removeItem('gochat_chat_token');
+    localStorage.removeItem('gochat_chat_channelName');
+
+    if (opts.keepChannelId && preservedChannelId) {
+      channelId = preservedChannelId;
+      localStorage.setItem('gochat_chat_channelId', preservedChannelId);
+      channelIdInput.value = preservedChannelId;
+    } else {
+      channelId = null;
+      localStorage.removeItem('gochat_chat_channelId');
+      channelIdInput.value = '';
+    }
+  }
+
+  function clearPairSessionState() {
+    pairSessionToken = null;
+    pairCode = null;
+    pairInstallCommands = {
+      unix: '',
+      windowsPowershell: ''
+    };
+  }
+
+  function stopPairPolling() {
+    if (pairPollTimer) {
+      clearInterval(pairPollTimer);
+      pairPollTimer = null;
+    }
+  }
+
+  function formatPairCode(rawCode) {
+    var digits = String(rawCode || '').replace(/\D/g, '').slice(0, 6);
+    if (!digits) return '------';
+    if (digits.length <= 3) return digits;
+    return digits.slice(0, 3) + ' ' + digits.slice(3);
+  }
+
+  function setPairStatus(message, tone) {
+    pairStatus.textContent = message || '';
+    pairStatus.className = tone ? ('pair-status ' + tone) : 'pair-status';
+  }
+
+  function applyPairBootstrap(data) {
+    if (!data) return;
+    if (data.code) {
+      pairCode = data.code;
+      pairCodeDisplay.textContent = formatPairCode(data.code);
+    }
+    if (data.sessionToken) {
+      pairSessionToken = data.sessionToken;
+    }
+    Object.keys(INSTALL_TAB_CONFIGS).forEach(function(tab) {
+      var config = INSTALL_TAB_CONFIGS[tab];
+      pairInstallCommands[tab] = data[config.responseKey] || '';
+    });
+    renderActiveInstallCommand();
+  }
+
+  function restoreLoginScreen(message, options) {
+    var opts = options || {};
+    var activeWs = ws;
+
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
+    stopStatusPolling();
+    stopPairPolling();
+    hideReconnectBanner();
+    ws = null;
+
+    clearSessionState({ keepChannelId: !!opts.keepChannelId });
+
+    if (activeWs) {
+      try {
+        activeWs.onclose = null;
+        activeWs.close();
+      } catch (e) {}
+    }
+
+    messagesWrap.innerHTML = '';
+    resetStreamingAssistantMessages();
+    discardPendingStreamingAudioAttachment();
+    clearLiveCaption();
+    isRecording = false;
+    isStreaming = false;
+    isTranscribing = false;
+    resetRecordButtonUI();
+    loginScreen.style.display = 'flex';
+    chatScreen.classList.remove('active');
+    loginBtn.disabled = false;
+    loginBtn.textContent = '连接';
+    secretInput.value = '';
+
+    document.getElementById('workStatusBadge').textContent = '-';
+    document.getElementById('workStatusBadge').className = 'status-badge';
+    document.getElementById('agentCountDisplay').textContent = '-';
+    document.getElementById('miniOfficeStatus').textContent = '-';
+    document.getElementById('miniOfficeStatus').className = 'mini-office-status';
+    starAnimator.setState('idle');
+    document.getElementById('miniOfficeDetail').textContent = '-';
+
+    if (message) {
+      showLoginError(message);
+    } else {
+      hideLoginError();
+    }
+
+    if (!urlChannelId) {
+      bootstrapPairFlow({ restart: true });
+    }
+  }
+
+  function fetchChatSession() {
+    if (!token) {
+      return Promise.reject(new Error('missing token'));
+    }
+    return fetch('/api/chat/session', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(parseJSONResponse);
+  }
+
+  function applySession(data) {
+    if (!data) return data;
+
+    if (data.channelId) {
+      channelId = data.channelId;
+      localStorage.setItem('gochat_chat_channelId', channelId);
+      channelIdInput.value = channelId;
+    }
+    if (data.channelName) {
+      channelName = data.channelName;
+      localStorage.setItem('gochat_chat_channelName', channelName);
+    }
+    return data;
+  }
+
+  function normalizeWorkStatus(rawStatus) {
+    var value = String(rawStatus || '').toLowerCase();
+    if (!value || value === 'standby' || value === 'ready') return 'idle';
+    if (value === 'working') return 'writing';
+    if (value === 'run' || value === 'running' || value === 'receive' || value === 'receiving') return 'executing';
+    if (value === 'sync' || value === 'reply' || value === 'replying') return 'syncing';
+    if (value === 'research') return 'researching';
+    if (value === 'failed' || value === 'failure') return 'error';
+    return value;
+  }
+
+  function normalizeOfficeStatus(rawStatus, rawOfficeStatus) {
+    var office = String(rawOfficeStatus || '').toLowerCase();
+    if (office === 'idle' || office === 'working' || office === 'syncing' || office === 'error') {
+      return office;
+    }
+    var status = normalizeWorkStatus(rawStatus);
+    if (status === 'idle') return 'idle';
+    if (status === 'syncing') return 'syncing';
+    if (status === 'error') return 'error';
+    return 'working';
+  }
+
+  function getStatusLabel(rawStatus, online) {
+    if (!online) return '离线';
+    switch (normalizeWorkStatus(rawStatus)) {
+      case 'writing':
+        return '写作中';
+      case 'researching':
+        return '调研中';
+      case 'executing':
+        return '执行中';
+      case 'syncing':
+        return '同步中';
+      case 'error':
+        return '异常';
+      case 'idle':
+        return '空闲';
+      default:
+        return '工作中';
+    }
+  }
+
+  function getStatusClass(rawStatus, officeStatus, online) {
+    if (!online) return 'offline';
+    var normalizedOffice = normalizeOfficeStatus(rawStatus, officeStatus);
+    if (normalizedOffice === 'syncing' || normalizedOffice === 'error' || normalizedOffice === 'idle') {
+      return normalizedOffice;
+    }
+    return 'working';
+  }
+
+  function getAnimatorState(rawStatus, officeStatus, online) {
+    if (!online) return 'idle';
+    return normalizeOfficeStatus(rawStatus, officeStatus) === 'idle' ? 'idle' : 'working';
+  }
+
+  function renderChannelStatus(session) {
+    var badge = document.getElementById('workStatusBadge');
+    var agentSpan = document.getElementById('agentCountDisplay');
+    var miniStatus = document.getElementById('miniOfficeStatus');
+    var miniDetail = document.getElementById('miniOfficeDetail');
+    var currentAgentText = agentSpan.textContent || '-';
+    var currentDetailText = miniDetail.textContent || '-';
+    var online = !!(session && session.online);
+
+    if (!online) {
+      badge.textContent = '离线';
+      badge.className = 'status-badge offline';
+      agentSpan.textContent = '-';
+      miniStatus.textContent = '离线';
+      miniStatus.className = 'mini-office-status offline';
+      starAnimator.setState('idle');
+      miniDetail.textContent = '-';
+      return;
+    }
+
+    var rawStatus = normalizeWorkStatus(session.workStatus || session.status || session.state || 'idle');
+    var officeStatus = normalizeOfficeStatus(rawStatus, session.officeStatus);
+    var badgeClass = getStatusClass(rawStatus, officeStatus, online);
+    var label = getStatusLabel(rawStatus, online);
+    var agentCount = typeof session.agentCount === 'number' ? session.agentCount : null;
+
+    badge.textContent = label;
+    badge.className = 'status-badge ' + badgeClass;
+    agentSpan.textContent = agentCount === null ? currentAgentText : (agentCount + ' 个代理');
+    miniStatus.textContent = label;
+    miniStatus.className = 'mini-office-status ' + badgeClass;
+    starAnimator.setState(getAnimatorState(rawStatus, officeStatus, online));
+    miniDetail.textContent = session.version || (agentCount === null ? currentDetailText : ('v' + agentCount));
+  }
+
+  function validateStoredSession() {
+    return fetchChatSession()
+      .then(function(data) {
+        return applySession(data);
+      })
+      .catch(function(err) {
+        if (err.status === 401 || err.status === 403) {
+          restoreLoginScreen(err.message || '连接凭证已失效，请重新输入密钥连接', { keepChannelId: true });
+          return null;
+        }
+        throw err;
+      });
+  }
+
+  function bootstrapPairFlow(options) {
+    if (token || urlChannelId) return;
+    var opts = options || {};
+    if (pairSessionToken && !opts.restart) {
+      setPairStatus('正在恢复连接状态，请稍候...');
+      startPairPolling();
+      return;
+    }
+    startPairFlow();
+  }
+
+  // Check for existing token
+  if (token && channelId) {
+    showChat();
+    validateStoredSession()
+      .then(function(data) {
+        if (!data || !token) return;
+        connectWebSocket();
+      })
+      .catch(function(err) {
+        console.error('Failed to validate stored session:', err);
+        connectWebSocket();
+      });
+  } else if (!urlChannelId) {
+    bootstrapPairFlow();
+  }
+
+  // Login
+  function doLogin() {
+    var cid = channelIdInput.value.trim();
+    var secret = secretInput.value;
+    
+    if (!cid || !secret) {
+      showLoginError('请输入渠道 ID 和密钥');
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = '连接中...';
+    hideLoginError();
+
+    fetch('/api/chat/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelId: cid, secret: secret })
+    })
+    .then(parseJSONResponse)
+    .then(function(data) {
+      if (data.token) {
+        stopPairPolling();
+        clearPairSessionState();
+        token = data.token;
+        localStorage.setItem('gochat_chat_token', token);
+        applySession(data);
+        channelName = channelName || data.channelId;
+        showChat();
+        connectWebSocket();
+      } else {
+        throw new Error(data.error || '登录失败');
+      }
+    })
+    .catch(function(err) {
+      showLoginError(err.message || '连接失败，请检查凭证');
+      loginBtn.disabled = false;
+      loginBtn.textContent = '连接';
+    });
+  }
+
+  window.doLogin = doLogin;
+
+  function startPairFlow() {
+    if (token || urlChannelId) return;
+    stopPairPolling();
+    clearPairSessionState();
+    pairCodeDisplay.textContent = '------';
+    installCommandInput.value = '';
+    pairStartBtn.disabled = true;
+    pairStartBtn.textContent = '生成中...';
+    setPairStatus('正在生成 6 位连接码，请稍候...');
+    hideLoginError();
+
+    fetch('/api/chat/pair/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'My OpenClaw' })
+    })
+    .then(parseJSONResponse)
+    .then(function(data) {
+      applyPairBootstrap(data);
+      pairStartBtn.disabled = false;
+      pairStartBtn.textContent = '刷新连接码';
+      setPairStatus('请在你的设备里运行上面的安装命令，插件会自动领取这个连接码。');
+      startPairPolling();
+    })
+    .catch(function(err) {
+      pairStartBtn.disabled = false;
+      pairStartBtn.textContent = '刷新连接码';
+      setPairStatus(err.message || '生成连接码失败，请稍后重试。', 'error');
+    });
+  }
+
+  window.startPairFlow = startPairFlow;
+
+  function renderActiveInstallCommand() {
+    installCommandInput.value = pairInstallCommands[activeInstallTab] || '';
+
+    document.getElementById('tabUnix').classList.toggle('active', activeInstallTab === 'unix');
+    document.getElementById('tabWindowsPowershell').classList.toggle('active', activeInstallTab === 'windowsPowershell');
+  }
+
+  function switchInstallTab(tab) {
+    if (!INSTALL_TAB_CONFIGS[tab]) {
+      tab = 'unix';
+    }
+    activeInstallTab = tab;
+    renderActiveInstallCommand();
+  }
+
+  window.switchInstallTab = switchInstallTab;
+
+  function copyInstallCommand() {
+    var command = installCommandInput.value.trim();
+    var config = INSTALL_TAB_CONFIGS[activeInstallTab] || INSTALL_TAB_CONFIGS.unix;
+    if (!command) {
+      setPairStatus('还没有可复制的安装命令，请先生成连接码。', 'error');
+      return;
+    }
+    var copyPromise = navigator.clipboard && navigator.clipboard.writeText
+      ? navigator.clipboard.writeText(command)
+      : Promise.reject(new Error('clipboard unavailable'));
+
+    copyPromise
+      .then(function() {
+        setPairStatus(config.label + '已复制，去设备里直接执行即可。');
+      })
+      .catch(function() {
+        installCommandInput.focus();
+        installCommandInput.select();
+        setPairStatus('已选中' + config.label + '，复制后到设备里执行。');
+      });
+  }
+
+  window.copyInstallCommand = copyInstallCommand;
+
+  function pollPairSession() {
+    if (!pairSessionToken || token) return;
+    fetch('/api/chat/pair/session?sessionToken=' + encodeURIComponent(pairSessionToken))
+    .then(parseJSONResponse)
+    .then(function(data) {
+      if (!data) return;
+      if (data.code) {
+        pairCodeDisplay.textContent = formatPairCode(data.code);
+      }
+      if (data.status === 'pending') {
+        setPairStatus('等待设备输入连接码。生成新码后，旧码会自动失效。');
+        return;
+      }
+      if (data.status === 'claimed') {
+        setPairStatus('设备已确认连接码，正在等待 OpenClaw 网关上线...');
+        return;
+      }
+      if (data.status === 'connected' && data.token) {
+        stopPairPolling();
+        clearPairSessionState();
+        token = data.token;
+        localStorage.setItem('gochat_chat_token', token);
+        applySession(data);
+        showChat();
+        connectWebSocket();
+      }
+    })
+    .catch(function(err) {
+      if (err.status === 404) {
+        stopPairPolling();
+        clearPairSessionState();
+        pairCodeDisplay.textContent = '------';
+        installCommandInput.value = '';
+        setPairStatus('连接码已过期，请重新生成。', 'error');
+        return;
+      }
+      setPairStatus(err.message || '获取连接状态失败，请稍后重试。', 'error');
+    });
+  }
+
+  function startPairPolling() {
+    if (!pairSessionToken || token) return;
+    stopPairPolling();
+    pollPairSession();
+    pairPollTimer = setInterval(pollPairSession, 3000);
+  }
+
+  function showLoginError(msg) {
+    loginError.textContent = msg;
+    loginError.style.display = 'block';
+  }
+
+  function hideLoginError() {
+    loginError.style.display = 'none';
+  }
+
+  function toggleMiniOffice() {
+    var float = document.getElementById('miniOfficeFloat');
+    var btn = document.getElementById('btnOfficeToggle');
+    float.classList.toggle('show');
+    btn.classList.toggle('active');
+    if (float.classList.contains('show')) {
+      syncMiniOfficeScale();
+    }
+  }
+
+  window.toggleMiniOffice = toggleMiniOffice;
+
+  var MINI_OFFICE_BASE_W = 1280;
+  var MINI_OFFICE_BASE_H = 720;
+
+  function syncMiniOfficeScale() {
+    var scene = document.getElementById('miniOfficeScene');
+    var stage = document.getElementById('miniOfficeStage');
+    if (!scene || !stage) return;
+
+    var scale = Math.min(scene.clientWidth / MINI_OFFICE_BASE_W, scene.clientHeight / MINI_OFFICE_BASE_H);
+    if (!isFinite(scale) || scale <= 0) return;
+    stage.style.transform = 'scale(' + scale + ')';
+  }
+
+  if (typeof ResizeObserver !== 'undefined') {
+    var miniOfficeResizeObserver = new ResizeObserver(syncMiniOfficeScale);
+    miniOfficeResizeObserver.observe(document.getElementById('miniOfficeScene'));
+  } else {
+    window.addEventListener('resize', syncMiniOfficeScale);
+  }
+
+  // Star sprite animator (pure JS, no Phaser)
+  // `star-idle-v5.png` uses 256x256 frames laid out on an 8x6 grid.
+  var starAnimator = (function() {
+    var sofaProp = document.getElementById('miniOfficeSofa');
+    var idleCanvasWrap = document.getElementById('miniOfficeStarIdleCanvasWrap');
+    var workingCanvasWrap = document.getElementById('miniOfficeStarWorkingCanvasWrap');
+    var idleCanvas = document.getElementById('miniOfficeStarIdleCanvas');
+    var workingCanvas = document.getElementById('miniOfficeStarWorkingCanvas');
+    if (!idleCanvasWrap || !workingCanvasWrap || !idleCanvas || !workingCanvas) return { setState: function(){}, stop: function(){} };
+
+    var IDLE_COLS = 8, IDLE_FRAME_W = 256, IDLE_FRAME_H = 256, IDLE_FRAMES = 30, IDLE_FPS = 8;
+    var IDLE_RENDER_W = idleCanvas.width;
+    var IDLE_RENDER_H = idleCanvas.height;
+
+    var WORK_COLS = 8, WORK_FRAME_W = 300, WORK_FRAME_H = 300, WORK_FRAMES = 40, WORK_FPS = 10;
+    var WORK_RENDER_W = workingCanvas.width;
+    var WORK_RENDER_H = workingCanvas.height;
+
+    var idleCtx = idleCanvas.getContext('2d');
+    var workingCtx = workingCanvas.getContext('2d');
+    var idleSheetImg = new Image();
+    idleSheetImg.src = '/static/star-idle-v5.png';
+    idleSheetImg.crossOrigin = 'anonymous';
+    var workSheetImg = new Image();
+    workSheetImg.src = '/static/star-working-spritesheet-grid.webp';
+    workSheetImg.crossOrigin = 'anonymous';
+
+    var idle = { frame: 0, playing: false, lastTime: 0, accum: 0 };
+    var work = { frame: 0, playing: false, lastTime: 0, accum: 0 };
+    var rafId = null;
+
+    if (idleCtx) idleCtx.imageSmoothingEnabled = false;
+    if (workingCtx) workingCtx.imageSmoothingEnabled = false;
+
+    function drawIdleFrame(frameIndex) {
+      if (!idleCtx || !idleSheetImg || !idleSheetImg.complete) return;
+      idleCtx.clearRect(0, 0, IDLE_RENDER_W, IDLE_RENDER_H);
+      var col = frameIndex % IDLE_COLS;
+      var row = (frameIndex / IDLE_COLS) | 0;
+      var sx = col * IDLE_FRAME_W;
+      var sy = row * IDLE_FRAME_H;
+      idleCtx.drawImage(idleSheetImg, sx, sy, IDLE_FRAME_W, IDLE_FRAME_H, 0, 0, IDLE_RENDER_W, IDLE_RENDER_H);
+    }
+
+    function drawWorkFrame(frame) {
+      if (!workingCtx || !workSheetImg || !workSheetImg.complete) return;
+      var col = frame % WORK_COLS;
+      var row = (frame / WORK_COLS) | 0;
+      var sx = col * WORK_FRAME_W;
+      var sy = row * WORK_FRAME_H;
+      workingCtx.clearRect(0, 0, WORK_RENDER_W, WORK_RENDER_H);
+      workingCtx.drawImage(workSheetImg, sx, sy, WORK_FRAME_W, WORK_FRAME_H, 0, 0, WORK_RENDER_W, WORK_RENDER_H);
+    }
+
+    function tick(time) {
+      var idleInterval = 1000 / IDLE_FPS;
+      var workInterval = 1000 / WORK_FPS;
+
+      if (idle.playing) {
+        idle.accum += time - idle.lastTime;
+        if (idle.accum >= idleInterval) {
+          idle.frame = (idle.frame + 1) % IDLE_FRAMES;
+          drawIdleFrame(idle.frame);
+          idle.accum = idle.accum % idleInterval;
+        }
+        idle.lastTime = time;
+      }
+
+      if (work.playing) {
+        work.accum += time - work.lastTime;
+        if (work.accum >= workInterval) {
+          work.frame = (work.frame + 1) % WORK_FRAMES;
+          drawWorkFrame(work.frame);
+          work.accum = work.accum % workInterval;
+        }
+        work.lastTime = time;
+      }
+
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function startIdle() {
+      idle.playing = true;
+      idle.lastTime = performance.now();
+      idle.accum = 0;
+      if (idle.frame >= IDLE_FRAMES) {
+        idle.frame = 0;
+      }
+      if (sofaProp) {
+        sofaProp.classList.add('hidden');
+      }
+      idleCanvasWrap.classList.add('visible');
+      if (idleSheetImg.complete && idleCtx) {
+        drawIdleFrame(idle.frame);
+      }
+    }
+
+    function setState(state) {
+      if (state === 'working') {
+        idle.playing = false;
+        idleCanvasWrap.classList.remove('visible');
+        if (sofaProp) {
+          sofaProp.classList.remove('hidden');
+        }
+        work.playing = true;
+        work.lastTime = performance.now();
+        work.accum = 0;
+        drawWorkFrame(work.frame);
+        workingCanvasWrap.classList.add('visible');
+      } else {
+        work.playing = false;
+        workingCanvasWrap.classList.remove('visible');
+        if (idleSheetImg.complete) {
+          startIdle();
+        }
+      }
+    }
+
+    function stop() {
+      if (rafId) cancelAnimationFrame(rafId);
+      idle.playing = false;
+      work.playing = false;
+      if (sofaProp) {
+        sofaProp.classList.remove('hidden');
+      }
+    }
+
+    // Single onload handler — starts idle when image is ready
+    idleSheetImg.onload = function() {
+      startIdle();
+    };
+
+    workSheetImg.onload = function() {
+      if (workingCtx) {
+        drawWorkFrame(work.frame);
+      }
+    };
+
+    rafId = requestAnimationFrame(tick);
+    drawWorkFrame(0);
+    if (idleSheetImg.complete) {
+      startIdle();
+    }
+
+    return { setState: setState, stop: stop };
+  })();
+  syncMiniOfficeScale();
+
+  // Drag functionality for mini office
+  (function() {
+    var dragEl = document.getElementById('miniOfficeFloat');
+    var titlebar = document.getElementById('miniOfficeTitlebar');
+    var pos = { x: 0, y: 0 };
+    var isDragging = false;
+
+    titlebar.addEventListener('mousedown', function(e) {
+      if (e.target.tagName === 'BUTTON') return;
+      isDragging = true;
+      var rect = dragEl.getBoundingClientRect();
+      pos.x = e.clientX - rect.left;
+      pos.y = e.clientY - rect.top;
+      dragEl.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!isDragging) return;
+      var x = e.clientX - pos.x;
+      var y = e.clientY - pos.y;
+      var maxX = window.innerWidth - dragEl.offsetWidth;
+      var maxY = window.innerHeight - dragEl.offsetHeight;
+      x = Math.max(0, Math.min(x, maxX));
+      y = Math.max(0, Math.min(y, maxY));
+      dragEl.style.left = x + 'px';
+      dragEl.style.right = 'auto';
+      dragEl.style.bottom = 'auto';
+      dragEl.style.top = y + 'px';
+    });
+
+    document.addEventListener('mouseup', function() {
+      isDragging = false;
+      dragEl.style.cursor = 'move';
+    });
+  })();
+
+  // Logout
+  function doLogout() {
+    restoreLoginScreen('', { keepChannelId: false });
+  }
+
+  window.doLogout = doLogout;
+
+  // Show chat screen
+  function showChat() {
+    loginScreen.style.display = 'none';
+    chatScreen.classList.add('active');
+    channelNameDisplay.textContent = channelName || channelId || '未命名渠道';
+    setConnectionStatus('connecting');
+  }
+
+  // WebSocket connection
+  function connectWebSocket() {
+    if (!token) return;
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
+    var wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsUrl = wsProtocol + '//' + location.host + '/ws/chat?token=' + encodeURIComponent(token);
+
+    try {
+      var opened = false;
+      ws = new WebSocket(wsUrl);
+      ws.binaryType = 'arraybuffer';
+      
+      ws.onopen = function() {
+        opened = true;
+        setConnectionStatus('connected');
+        hideReconnectBanner();
+        startStatusPolling();
+        // Send hello with client identity
+        ws.send(JSON.stringify({
+          type: 'hello',
+          clientType: 'web',
+          clientVersion: '1.0.0',
+          clientMetadata: {
+            os: navigator.platform || 'unknown',
+            language: navigator.language || 'unknown',
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown'
+          }
+        }));
+      };
+
+      ws.onclose = function(event) {
+        ws = null;
+        setConnectionStatus('disconnected');
+        stopStatusPolling();
+        if (!token) return;
+        handleSocketDisconnect(opened, event);
+      };
+
+      ws.onmessage = function(event) {
+        try {
+          var data = JSON.parse(event.data);
+          handleMessage(data);
+        } catch (e) {
+          console.error('Parse error:', e);
+        }
+      };
+
+      ws.onerror = function(err) {
+        console.error('WebSocket error:', err);
+        setConnectionStatus('disconnected');
+      };
+    } catch (e) {
+      console.error('WebSocket creation failed:', e);
+      setConnectionStatus('disconnected');
+      scheduleReconnect();
+    }
+  }
+
+  function setConnectionStatus(status) {
+    statusDot.className = 'status-dot';
+    if (status === 'connected') {
+      statusText.textContent = '已连接';
+    } else if (status === 'connecting') {
+      statusDot.classList.add('connecting');
+      statusText.textContent = '连接中...';
+    } else {
+      statusDot.classList.add('disconnected');
+      statusText.textContent = '已断开';
+    }
+  }
+
+  // Fetch channel status from chat session API
+  var statusTimer = null;
+  function fetchChannelStatus() {
+    if (!token) return;
+    fetchChatSession()
+    .then(function(session) {
+      applySession(session);
+      renderChannelStatus(session);
+    })
+    .catch(function(err) {
+      if (err.status === 401 || err.status === 403) {
+        restoreLoginScreen(err.message || '连接凭证已失效，请重新输入密钥连接', { keepChannelId: true });
+        return;
+      }
+      console.error('Failed to fetch channel status:', err);
+    });
+  }
+
+  function startStatusPolling() {
+    if (statusTimer) clearInterval(statusTimer);
+    fetchChannelStatus();
+    statusTimer = setInterval(fetchChannelStatus, 10000);
+  }
+
+  function stopStatusPolling() {
+    if (statusTimer) {
+      clearInterval(statusTimer);
+      statusTimer = null;
+    }
+  }
+
+  function showReconnectBanner() {
+    reconnectBanner.classList.add('show');
+  }
+
+  function hideReconnectBanner() {
+    reconnectBanner.classList.remove('show');
+  }
+
+  function scheduleReconnect() {
+    if (!token) return;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+    }
+    showReconnectBanner();
+    reconnectTimer = setTimeout(function() {
+      connectWebSocket();
+    }, 3000);
+  }
+
+  function handleSocketDisconnect(opened, event) {
+    validateStoredSession()
+      .then(function(data) {
+        if (!data || !token) return;
+        scheduleReconnect();
+      })
+      .catch(function(err) {
+        console.error('Failed to validate session after disconnect:', err);
+        if (!token) return;
+        if (!opened && event && event.code === 1006) {
+          scheduleReconnect();
+          return;
+        }
+        scheduleReconnect();
+      });
+  }
+
+  function guessMediaType(url) {
+    var lower = url.toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(lower)) return 'image';
+    if (/\.(mp3|wav|ogg|m4a|webm)(\?|$)/i.test(lower)) return 'audio';
+    if (/\.(mp4|mov|avi)(\?|$)/i.test(lower)) return 'video';
+    return 'file';
+  }
+
+  function ensureMessagesReady() {
+    if (emptyState && emptyState.parentNode) {
+      emptyState.parentNode.removeChild(emptyState);
+      emptyState = null;
+    }
+  }
+
+  function buildAttachmentHtml(attachment) {
+    if (!attachment || !attachment.url) return '';
+
+    var html = '<div class="message-attachment">';
+    if (attachment.type === 'image') {
+      html += '<img src="' + escapeHtml(attachment.url) + '" style="max-width:200px;max-height:200px;border-radius:6px;display:block;margin-bottom:6px;" />';
+    } else if (attachment.type === 'audio') {
+      html += '<audio controls src="' + escapeHtml(attachment.url) + '" style="width:100%;max-width:260px;margin-bottom:6px;"></audio>';
+    } else if (attachment.type === 'video') {
+      html += '<video controls src="' + escapeHtml(attachment.url) + '" style="max-width:260px;max-height:180px;border-radius:6px;margin-bottom:6px;"></video>';
+    } else {
+      html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>';
+      html += '<a href="' + escapeHtml(attachment.url) + '" target="_blank" style="color:var(--accent-blue);text-decoration:none;font-size:13px;margin-left:6px;">' + escapeHtml(attachment.name || 'File') + '</a>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderMessageNode(msg, text, timestamp, attachment, streaming) {
+    msg.classList.toggle('message-streaming', !!streaming);
+    msg.innerHTML =
+      buildAttachmentHtml(attachment) +
+      '<div class="message-text">' + escapeHtml(text || '') + '</div>' +
+      '<div class="message-meta">' + formatTime(timestamp || Date.now()) + '</div>';
+  }
+
+  function getReplyStreamKey(data) {
+    var conversationKey = data.conversationId || 'default';
+    var base = data.streamId || data.messageId || data.replyTo;
+    return base ? conversationKey + ':' + base : conversationKey;
+  }
+
+  function upsertStreamingAssistantMessage(data, mode) {
+    var key = getReplyStreamKey(data);
+    var current = aiStreamingMessages[key];
+    var timestamp = data.timestamp || Date.now();
+
+    if (!current) {
+      ensureMessagesReady();
+      var msg = document.createElement('div');
+      msg.className = 'message message-ai message-streaming';
+      messagesWrap.appendChild(msg);
+      current = aiStreamingMessages[key] = {
+        node: msg,
+        text: '',
+        timestamp: timestamp,
+        attachment: null
+      };
+    }
+
+    if (mode === 'append') {
+      current.text += data.delta || data.text || '';
+    } else if (typeof data.text === 'string') {
+      current.text = data.text;
+    }
+
+    if (data.mediaUrl) {
+      current.attachment = { name: 'media', url: data.mediaUrl, type: guessMediaType(data.mediaUrl) };
+    }
+    current.timestamp = timestamp;
+    renderMessageNode(current.node, current.text, current.timestamp, current.attachment, true);
+    scrollToBottom();
+    return key;
+  }
+
+  function finalizeStreamingAssistantMessage(data) {
+    var key = getReplyStreamKey(data);
+    var current = aiStreamingMessages[key];
+    var timestamp = data.timestamp || Date.now();
+
+    if (!current) {
+      var attachment = null;
+      if (data.mediaUrl) {
+        attachment = { name: 'media', url: data.mediaUrl, type: guessMediaType(data.mediaUrl) };
+      }
+      addMessage(data.text || '', 'ai', timestamp, attachment);
+      return;
+    }
+
+    if (typeof data.text === 'string') {
+      current.text = data.text;
+    }
+    if (data.mediaUrl) {
+      current.attachment = { name: 'media', url: data.mediaUrl, type: guessMediaType(data.mediaUrl) };
+    }
+    current.timestamp = timestamp;
+    renderMessageNode(current.node, current.text, current.timestamp, current.attachment, false);
+    delete aiStreamingMessages[key];
+    scrollToBottom();
+  }
+
+  function resetStreamingAssistantMessages() {
+    aiStreamingMessages = Object.create(null);
+  }
+
+  // Handle incoming messages
+  function handleMessage(data) {
+    if (data.type === 'reply.start') {
+      upsertStreamingAssistantMessage(data, 'replace');
+    } else if (data.type === 'reply.delta') {
+      upsertStreamingAssistantMessage(data, 'append');
+    } else if (data.type === 'reply.end') {
+      finalizeStreamingAssistantMessage(data);
+    } else if (data.type === 'reply') {
+      finalizeStreamingAssistantMessage(data);
+    } else if (data.type === 'status') {
+      renderChannelStatus(data);
+    } else if (data.type === 'stt.partial') {
+      setLiveCaption(data.text || '', data.phase || '');
+    } else if (data.type === 'stt') {
+      isTranscribing = false;
+      clearLiveCaption();
+      resetRecordButtonUI();
+      var audioAttachment = consumePendingStreamingAudioAttachment();
+      if (data.text || audioAttachment) {
+        addMessage(data.text || '语音消息', 'user', Date.now(), audioAttachment);
+        renderChannelStatus({ online: true, workStatus: 'executing' });
+      }
+    } else if (data.type === 'error') {
+      if (isTranscribing) {
+        isTranscribing = false;
+        clearLiveCaption();
+        resetRecordButtonUI();
+        var pendingAudio = consumePendingStreamingAudioAttachment();
+        if (pendingAudio) {
+          addMessage('语音消息', 'user', Date.now(), pendingAudio);
+        }
+        if (data.text) {
+          addMessage('\u26a0\ufe0f ' + data.text, 'ai', Date.now(), null);
+        }
+      }
+      if (data.code === 'auth' || data.code === 'unauthorized') {
+        doLogout();
+      }
+    }
+  }
+
+  // Add message to UI
+  function addMessage(text, type, timestamp, attachment) {
+    ensureMessagesReady();
+
+    var msg = document.createElement('div');
+    msg.className = 'message message-' + type;
+    renderMessageNode(msg, text, timestamp, attachment, false);
+    messagesWrap.appendChild(msg);
+    scrollToBottom();
+  }
+
+  function scrollToBottom() {
+    messagesWrap.scrollTop = messagesWrap.scrollHeight;
+  }
+
+  // Send message
+  function sendMessage() {
+    return sendMessageWithFileOverride(null);
+  }
+
+  function sendMessageWithFileOverride(fileOverride) {
+    var text = messageInput.value.trim();
+    var fileToSend = fileOverride || selectedFile;
+    if (!text && !fileToSend) return;
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      alert('连接已断开，请稍候重试');
+      return;
+    }
+
+    sendBtn.disabled = true;
+
+    var sendAfterUpload = function(attachmentInfo) {
+      var payload = {
+        type: 'message',
+        text: text,
+        conversationId: 'default'
+      };
+      if (attachmentInfo) {
+        payload.attachments = [attachmentInfo];
+      }
+
+      try {
+        ws.send(JSON.stringify(payload));
+        addMessage(text, 'user', Date.now(), attachmentInfo);
+        renderChannelStatus({
+          online: true,
+          workStatus: 'executing',
+          officeStatus: 'working'
+        });
+        isTranscribing = false;
+        resetRecordButtonUI();
+        messageInput.value = '';
+        autoResize(messageInput);
+        if (fileOverride) {
+          if (fileOverride === selectedFile) {
+            clearAttachment();
+          }
+        } else {
+          clearAttachment();
+        }
+        updateSendButton();
+      } catch (e) {
+        console.error('Send error:', e);
+        sendBtn.disabled = false;
+        isTranscribing = false;
+        resetRecordButtonUI();
+      }
+    };
+
+    if (fileToSend) {
+      uploadFile(fileToSend, function(err, info) {
+        if (err) {
+          alert('文件上传失败: ' + err);
+          sendBtn.disabled = false;
+          isTranscribing = false;
+          resetRecordButtonUI();
+          return;
+        }
+        sendAfterUpload(info);
+      });
+    } else {
+      sendAfterUpload(null);
+    }
+  }
+
+  window.sendMessage = sendMessage;
+
+  // File handling
+  function handleFileSelect(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    
+    selectedFile = file;
+    attachmentName.textContent = file.name;
+    attachmentPreview.classList.add('show');
+    updateSendButton();
+  }
+
+  window.handleFileSelect = handleFileSelect;
+
+  function clearAttachment() {
+    selectedFile = null;
+    fileInput.value = '';
+    attachmentPreview.classList.remove('show');
+    updateSendButton();
+  }
+
+  window.clearAttachment = clearAttachment;
+
+  function uploadFile(file, callback) {
+    // Step 1: Get presign URL
+    fetch('/api/upload/presign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, contentType: file.type || 'application/octet-stream' })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(presign) {
+      if (!presign.uploadUrl) {
+        callback(presign.error || 'Presign failed');
+        return;
+      }
+
+      // Step 2: Upload file to presigned URL
+      var uploadHeaders = { 'Content-Type': file.type || 'application/octet-stream' };
+      if (presign.headers) {
+        Object.keys(presign.headers).forEach(function(k) { uploadHeaders[k] = presign.headers[k]; });
+      }
+
+      fetch(presign.uploadUrl, {
+        method: presign.method || 'PUT',
+        headers: uploadHeaders,
+        body: file
+      })
+      .then(function(uploadRes) {
+        if (!uploadRes.ok) {
+          callback('Upload failed: ' + uploadRes.status);
+          return;
+        }
+
+        // Step 3: Confirm upload
+        fetch('/api/upload/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileKey: presign.fileKey })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(confirmed) {
+          if (confirmed.url) {
+            callback(null, {
+              name: confirmed.name || file.name,
+              url: confirmed.url,
+              type: confirmed.type || file.type,
+              size: confirmed.size || file.size
+            });
+          } else {
+            callback(confirmed.error || 'Confirm failed');
+          }
+        })
+        .catch(function(err) { callback(err.message || 'Confirm failed'); });
+      })
+      .catch(function(err) { callback(err.message || 'Upload failed'); });
+    })
+    .catch(function(err) { callback(err.message || 'Presign failed'); });
+  }
+
+  // Recording (real-time Opus streaming via WebCodecs, with MediaRecorder as fallback)
+  function toggleRecording() {
+    if (isRecording) {
+      if (isStreaming) {
+        stopStreamingRecording();
+      } else {
+        stopLegacyRecording();
+      }
+    } else {
+      if (isTranscribing) return;
+      startStreamingRecording();
+    }
+  }
+
+  window.toggleRecording = toggleRecording;
+
+  function appendPCMChunk(existing, chunk) {
+    var merged = new Float32Array(existing.length + chunk.length);
+    merged.set(existing, 0);
+    merged.set(chunk, existing.length);
+    return merged;
+  }
+
+  function getAudioModeConfig(mode) {
+    if (mode === '2pass') {
+      return {
+        mode: '2pass',
+        label: '实时字幕',
+        format: 'pcm16le',
+        sttMode: '2pass',
+        frameDuration: 60,
+        hint: '录音中实时出字，松开后返回最终修正',
+        requiresEncoder: false
+      };
+    }
+    if (mode === 'direct') {
+      return {
+        mode: 'direct',
+        label: '录音直发',
+        format: 'pcm16le',
+        sttMode: 'direct',
+        frameDuration: 60,
+        hint: '录音结束后直接把音频作为附件发给插件',
+        requiresEncoder: false
+      };
+    }
+    return {
+      mode: 'offline',
+      label: '离线整段',
+      format: 'opus',
+      sttMode: 'offline',
+      frameDuration: 20,
+      hint: '录音结束后整段转写，兼容旧方案',
+      requiresEncoder: true
+    };
+  }
+
+  function renderAudioMode() {
+    var config = getAudioModeConfig(audioMode);
+    audioModeOfflineBtn.classList.toggle('active', audioMode === 'offline');
+    audioMode2PassBtn.classList.toggle('active', audioMode === '2pass');
+    audioModeDirectBtn.classList.toggle('active', audioMode === 'direct');
+    audioModeHint.textContent = config.hint;
+    recordBtn.title = '录音：' + config.label;
+  }
+
+  function setAudioMode(mode) {
+    if (mode !== 'offline' && mode !== '2pass' && mode !== 'direct') return;
+    if (isRecording || isTranscribing) return;
+    audioMode = mode;
+    localStorage.setItem('gochat_chat_audio_mode', mode);
+    clearLiveCaption();
+    renderAudioMode();
+  }
+
+  window.setAudioMode = setAudioMode;
+
+  function setLiveCaption(text, phase) {
+    var value = (text || '').trim();
+    if (!value) {
+      sttLiveBar.classList.remove('show');
+      sttLiveLabel.textContent = '实时字幕';
+      sttLiveText.textContent = '';
+      return;
+    }
+    sttLiveLabel.textContent = phase === '2pass-offline' ? '最终修正' : '实时字幕';
+    sttLiveText.textContent = value;
+    sttLiveBar.classList.add('show');
+  }
+
+  function clearLiveCaption() {
+    setLiveCaption('', '');
+  }
+
+  function getRecordButtonDefaultHTML() {
+    return [
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">',
+      '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>',
+      '<path d="M19 10v2a7 7 0 0 1-14 0v-2"/>',
+      '<line x1="12" y1="19" x2="12" y2="23"/>',
+      '<line x1="8" y1="23" x2="16" y2="23"/>',
+      '</svg>'
+    ].join('');
+  }
+
+  function resetRecordButtonUI() {
+    recordBtn.classList.remove('recording');
+    recordBtn.classList.remove('transcribing');
+    recordBtn.innerHTML = getRecordButtonDefaultHTML();
+  }
+
+  function discardPendingStreamingAudioAttachment() {
+    if (pendingStreamingAudioAttachment && pendingStreamingAudioAttachment.url && pendingStreamingAudioAttachment.url.indexOf('blob:') === 0) {
+      URL.revokeObjectURL(pendingStreamingAudioAttachment.url);
+    }
+    pendingStreamingAudioAttachment = null;
+  }
+
+  function consumePendingStreamingAudioAttachment() {
+    var attachment = pendingStreamingAudioAttachment;
+    pendingStreamingAudioAttachment = null;
+    return attachment;
+  }
+
+  function encodePCMToWavBlob(chunks, totalSamples, sampleRate, channels) {
+    if (!chunks || !chunks.length || !totalSamples) return null;
+
+    var bytesPerSample = 2;
+    var dataSize = totalSamples * bytesPerSample;
+    var buffer = new ArrayBuffer(44 + dataSize);
+    var view = new DataView(buffer);
+    var offset = 0;
+
+    function writeString(value) {
+      for (var i = 0; i < value.length; i++) {
+        view.setUint8(offset++, value.charCodeAt(i));
+      }
+    }
+
+    writeString('RIFF');
+    view.setUint32(offset, 36 + dataSize, true); offset += 4;
+    writeString('WAVE');
+    writeString('fmt ');
+    view.setUint32(offset, 16, true); offset += 4;
+    view.setUint16(offset, 1, true); offset += 2;
+    view.setUint16(offset, channels, true); offset += 2;
+    view.setUint32(offset, sampleRate, true); offset += 4;
+    view.setUint32(offset, sampleRate * channels * bytesPerSample, true); offset += 4;
+    view.setUint16(offset, channels * bytesPerSample, true); offset += 2;
+    view.setUint16(offset, bytesPerSample * 8, true); offset += 2;
+    writeString('data');
+    view.setUint32(offset, dataSize, true); offset += 4;
+
+    for (var c = 0; c < chunks.length; c++) {
+      var chunk = chunks[c];
+      for (var j = 0; j < chunk.length; j++) {
+        var sample = Math.max(-1, Math.min(1, chunk[j]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+      }
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
+  function buildStreamingAudioAttachment() {
+    var blob = encodePCMToWavBlob(streamingPCMChunks, streamingPCMTotalSamples, streamingSampleRate, streamingChannels);
+    if (!blob) return null;
+    return {
+      name: 'recording-' + Date.now() + '.wav',
+      url: URL.createObjectURL(blob),
+      type: 'audio',
+      mimeType: 'audio/wav',
+      size: blob.size
+    };
+  }
+
+  function encodeStreamingPCMFrame(frame) {
+    if (!audioEncoder || audioEncoder.state !== 'configured') return;
+    try {
+      var audioData = new AudioData({
+        format: 'f32',
+        sampleRate: streamingSampleRate,
+        numberOfFrames: frame.length,
+        numberOfChannels: streamingChannels,
+        timestamp: Math.round(streamingSamplesSent * 1e6 / streamingSampleRate),
+        data: frame
+      });
+      streamingSamplesSent += frame.length;
+      audioEncoder.encode(audioData);
+      audioData.close();
+    } catch (err) {
+      console.error('encode error:', err);
+    }
+  }
+
+  function encodePCMFrameToBytes(frame) {
+    var buffer = new ArrayBuffer(frame.length * 2);
+    var view = new DataView(buffer);
+    for (var i = 0; i < frame.length; i++) {
+      var sample = Math.max(-1, Math.min(1, frame[i]));
+      view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+    }
+    return new Uint8Array(buffer);
+  }
+
+  function sendPCMFrame(frame) {
+    var timestampMs = Math.round(streamingSamplesSent * 1000 / streamingSampleRate);
+    streamingSamplesSent += frame.length;
+    sendAudioBinaryFrame(encodePCMFrameToBytes(frame), timestampMs);
+  }
+
+  function flushStreamingFrames(padFinalFrame) {
+    if (!streamingFrameSize) return;
+
+    while (streamingPCMBuffer.length >= streamingFrameSize) {
+      var frame = streamingPCMBuffer.slice(0, streamingFrameSize);
+      streamingPCMBuffer = streamingPCMBuffer.slice(streamingFrameSize);
+      if (streamingFormat === 'pcm16le') {
+        sendPCMFrame(frame);
+      } else {
+        encodeStreamingPCMFrame(frame);
+      }
+    }
+
+    if (padFinalFrame && streamingPCMBuffer.length > 0) {
+      var tail = new Float32Array(streamingFrameSize);
+      tail.set(streamingPCMBuffer);
+      streamingPCMBuffer = new Float32Array(0);
+      if (streamingFormat === 'pcm16le') {
+        sendPCMFrame(tail);
+      } else {
+        encodeStreamingPCMFrame(tail);
+      }
+    }
+  }
+
+  function startStreamingRecording() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      alert('请先连接到渠道');
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('您的浏览器不支持录音功能');
+      return;
+    }
+    var config = getAudioModeConfig(audioMode);
+    if (config.requiresEncoder && (typeof AudioEncoder === 'undefined' || typeof AudioData === 'undefined')) {
+      startLegacyRecording();
+      return;
+    }
+
+    var sampleRate = 16000;
+    var channels = 1;
+    var frameDuration = config.frameDuration;
+    var frameSize = Math.round(sampleRate * frameDuration / 1000);
+
+    discardPendingStreamingAudioAttachment();
+    clearLiveCaption();
+    streamingSampleRate = sampleRate;
+    streamingChannels = channels;
+    streamingFrameSize = frameSize;
+    streamingPCMBuffer = new Float32Array(0);
+    streamingSamplesSent = 0;
+    streamingPCMChunks = [];
+    streamingPCMTotalSamples = 0;
+    streamingFormat = config.format;
+    streamingSTTMode = config.sttMode;
+    streamingFrameDuration = frameDuration;
+
+    navigator.mediaDevices.getUserMedia({
+      audio: {
+        sampleRate: sampleRate,
+        channelCount: channels,
+        echoCancellation: true,
+        noiseSuppression: true
+      }
+    }).then(function(stream) {
+      audioStream = stream;
+
+      if (config.mode !== 'direct') {
+        try {
+          ws.send(JSON.stringify({
+            type: 'audio.start',
+            format: config.format,
+            sttMode: config.sttMode,
+            sampleRate: sampleRate,
+            channels: channels,
+            frameDuration: frameDuration
+          }));
+        } catch (sendErr) {
+          stream.getTracks().forEach(function(track) { track.stop(); });
+          audioStream = null;
+          console.error('audio.start send failed:', sendErr);
+          alert('无法启动语音会话: ' + (sendErr.message || sendErr));
+          return;
+        }
+      }
+
+      audioContext = new AudioContext({ sampleRate: sampleRate });
+      var source = audioContext.createMediaStreamSource(stream);
+      scriptProcessor = audioContext.createScriptProcessor(4096, channels, channels);
+
+      if (config.requiresEncoder) {
+        audioEncoder = new AudioEncoder({
+          output: function(chunk) {
+            var data = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(data);
+            sendAudioBinaryFrame(data, Math.round(chunk.timestamp / 1000));
+          },
+          error: function(err) {
+            console.error('AudioEncoder error:', err);
+          }
+        });
+
+        audioEncoder.configure({
+          codec: 'opus',
+          sampleRate: sampleRate,
+          numberOfChannels: channels,
+          bitrate: 64000
+        });
+      } else {
+        audioEncoder = null;
+      }
+
+      scriptProcessor.onaudioprocess = function(e) {
+        var inputData = e.inputBuffer.getChannelData(0);
+        var pcmCopy = new Float32Array(inputData.length);
+        pcmCopy.set(inputData);
+        streamingPCMChunks.push(pcmCopy);
+        streamingPCMTotalSamples += pcmCopy.length;
+        streamingPCMBuffer = appendPCMChunk(streamingPCMBuffer, inputData);
+        flushStreamingFrames(false);
+      };
+
+      source.connect(scriptProcessor);
+      scriptProcessor.connect(audioContext.destination);
+
+      isStreaming = true;
+      isRecording = true;
+      streamingSeconds = 0;
+      recordBtn.classList.add('recording');
+      recordBtn.innerHTML = '<span id="rec-timer">0s</span>';
+
+      streamingTimerInterval = setInterval(function() {
+        streamingSeconds++;
+        var timerEl = document.getElementById('rec-timer');
+        if (timerEl) timerEl.textContent = streamingSeconds + 's';
+      }, 1000);
+
+    }).catch(function(err) {
+      console.error('Recording error:', err);
+      alert('无法访问麦克风: ' + (err.message || err));
+    });
+  }
+
+  function stopStreamingRecording() {
+    var mode = audioMode;
+    if (streamingTimerInterval) {
+      clearInterval(streamingTimerInterval);
+      streamingTimerInterval = null;
+    }
+
+    if (scriptProcessor) {
+      scriptProcessor.disconnect();
+      scriptProcessor = null;
+    }
+    if (audioStream) {
+      audioStream.getTracks().forEach(function(t) { t.stop(); });
+      audioStream = null;
+    }
+
+    var finishStop = function() {
+      if (audioContext) {
+        audioContext.close().catch(function() {});
+        audioContext = null;
+      }
+      if (audioEncoder) {
+        audioEncoder.close();
+        audioEncoder = null;
+      }
+      pendingStreamingAudioAttachment = buildStreamingAudioAttachment();
+      streamingPCMBuffer = new Float32Array(0);
+      streamingSamplesSent = 0;
+      streamingPCMChunks = [];
+      streamingPCMTotalSamples = 0;
+
+      if (mode !== 'direct' && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'audio.stop' }));
+      }
+
+      isStreaming = false;
+      isRecording = false;
+      recordBtn.classList.remove('recording');
+
+      if (mode === 'direct') {
+        var directAttachment = consumePendingStreamingAudioAttachment();
+        if (!directAttachment || !directAttachment.url) {
+          resetRecordButtonUI();
+          updateSendButton();
+          return;
+        }
+        isTranscribing = true;
+        recordBtn.classList.add('transcribing');
+        recordBtn.innerHTML = '...';
+        fetch(directAttachment.url)
+          .then(function(res) { return res.blob(); })
+          .then(function(blob) {
+            var file = new File([blob], directAttachment.name || ('recording-' + Date.now() + '.wav'), {
+              type: directAttachment.mimeType || blob.type || 'audio/wav'
+            });
+            return sendMessageWithFileOverride(file);
+          })
+          .catch(function(err) {
+            console.error('direct audio send failed:', err);
+            alert('录音发送失败: ' + (err.message || err));
+            isTranscribing = false;
+            resetRecordButtonUI();
+          })
+          .finally(function() {
+            if (directAttachment.url && directAttachment.url.indexOf('blob:') === 0) {
+              URL.revokeObjectURL(directAttachment.url);
+            }
+          });
+        return;
+      }
+
+      isTranscribing = true;
+      recordBtn.classList.add('transcribing');
+      recordBtn.innerHTML = '...';
+    };
+
+    if (streamingFormat === 'opus' && audioEncoder && audioEncoder.state === 'configured') {
+      flushStreamingFrames(true);
+      audioEncoder.flush().then(finishStop).catch(function() {
+        finishStop();
+      });
+    } else {
+      flushStreamingFrames(true);
+      finishStop();
+    }
+  }
+
+  function sendAudioBinaryFrame(payload, timestampMs) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    var headerSize = 16;
+    var frame = new ArrayBuffer(headerSize + payload.length);
+    var view = new DataView(frame);
+
+    view.setUint16(0, 2, false);
+    view.setUint16(2, 0, false);
+    view.setUint32(4, 0, false);
+    view.setUint32(8, timestampMs, false);
+    view.setUint32(12, payload.length, false);
+
+    var bytes = new Uint8Array(frame);
+    bytes.set(payload, headerSize);
+
+    ws.send(frame);
+  }
+
+  // --- Legacy recording (MediaRecorder) – kept as fallback ---
+  function startLegacyRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('您的浏览器不支持录音功能');
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        
+        mediaRecorder.ondataavailable = function(e) {
+          audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = function() {
+          var blob = new Blob(audioChunks, { type: 'audio/webm' });
+          var file = new File([blob], 'recording-' + Date.now() + '.webm', { type: 'audio/webm' });
+          selectedFile = file;
+          attachmentName.textContent = file.name;
+          attachmentPreview.classList.add('show');
+          updateSendButton();
+          
+          stream.getTracks().forEach(function(track) { track.stop(); });
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        recordBtn.classList.add('recording');
+      })
+      .catch(function(err) {
+        console.error('Recording error:', err);
+        alert('无法访问麦克风');
+      });
+  }
+
+  function stopLegacyRecording() {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      isRecording = false;
+      recordBtn.classList.remove('recording');
+    }
+  }
+
+  // Input handling
+  function handleKeyDown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  }
+
+  window.handleKeyDown = handleKeyDown;
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 96) + 'px';
+  }
+
+  window.autoResize = autoResize;
+
+  function updateSendButton() {
+    var hasText = messageInput.value.trim().length > 0;
+    var hasAttachment = selectedFile !== null;
+    sendBtn.disabled = !hasText && !hasAttachment;
+  }
+
+  // Utilities
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  function formatTime(ts) {
+    var d = new Date(ts);
+    var h = String(d.getHours()).padStart(2, '0');
+    var m = String(d.getMinutes()).padStart(2, '0');
+    return h + ':' + m;
+  }
+})();
+</script>
+</body>
+</html>
