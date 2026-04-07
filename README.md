@@ -202,6 +202,10 @@ channels:
 
     # Media settings
     mediaMaxMb: 25
+    # Extra trusted hosts for inbound attachment fetches.
+    # The relay host from relayPlatformUrl is trusted automatically.
+    trustedAttachmentHosts:
+      - fund.moyi.vip
 
     # Account-specific settings
     accounts:

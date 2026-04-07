@@ -43,6 +43,7 @@ export type GoChatAccountConfig = {
   responsePrefix?: string;
   mediaMaxMb?: number;
   allowPrivateNetwork?: boolean;
+  trustedAttachmentHosts?: string[];
   directPort?: number;
   directHost?: string;
   relayPlatformUrl?: string;

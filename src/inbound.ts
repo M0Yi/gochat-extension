@@ -28,12 +28,110 @@ type ResolvedMediaInfo = {
   kind: "image" | "audio" | "video" | "document" | "unknown";
 };
 
+type RemoteFetchResult = {
+  buffer: Buffer;
+  contentType?: string;
+};
+
+function normalizeHost(value: string | undefined): string | null {
+  const host = String(value ?? "").trim().toLowerCase();
+  return host ? host : null;
+}
+
+function tryParseUrl(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function resolveTrustedAttachmentHosts(account: ResolvedGoChatAccount): Set<string> {
+  const hosts = new Set<string>();
+  const relayUrl = tryParseUrl(account.relayPlatformUrl);
+  const relayHost = normalizeHost(relayUrl?.hostname);
+  if (relayHost) {
+    hosts.add(relayHost);
+  }
+  for (const host of account.config.trustedAttachmentHosts ?? []) {
+    const normalized = normalizeHost(host);
+    if (normalized) {
+      hosts.add(normalized);
+    }
+  }
+  return hosts;
+}
+
+function shouldBypassRemoteMediaSsrf(params: {
+  url: string;
+  trustedHosts: Set<string>;
+}): boolean {
+  const parsed = tryParseUrl(params.url);
+  if (!parsed) {
+    return false;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return false;
+  }
+  return params.trustedHosts.has(parsed.hostname.trim().toLowerCase());
+}
+
+async function fetchTrustedRemoteMedia(params: {
+  url: string;
+  trustedHosts: Set<string>;
+  logger: { warn: (message: string) => void; info?: (message: string) => void };
+  redirectCount?: number;
+}): Promise<RemoteFetchResult> {
+  const redirectCount = params.redirectCount ?? 0;
+  if (redirectCount > 5) {
+    throw new Error("too many redirects");
+  }
+
+  const parsed = tryParseUrl(params.url);
+  if (!parsed) {
+    throw new Error("invalid attachment URL");
+  }
+  if (!params.trustedHosts.has(parsed.hostname.trim().toLowerCase())) {
+    throw new Error(`attachment host is not trusted: ${parsed.hostname}`);
+  }
+
+  const response = await fetch(parsed, {
+    redirect: "manual",
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    if (!location) {
+      throw new Error(`redirect (${response.status}) without location`);
+    }
+    const nextUrl = new URL(location, parsed).toString();
+    return await fetchTrustedRemoteMedia({
+      ...params,
+      url: nextUrl,
+      redirectCount: redirectCount + 1,
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error(`download failed (${response.status})`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    contentType: response.headers.get("content-type") ?? undefined,
+  };
+}
+
 async function resolveGoChatMedia(
   attachments: GoChatAttachment[],
   account: ResolvedGoChatAccount,
 ): Promise<ResolvedMediaInfo[]> {
   const core = getGoChatRuntime();
   const results: ResolvedMediaInfo[] = [];
+  const logger = core.logging.getChildLogger({ channel: "gochat" });
+  const trustedHosts = resolveTrustedAttachmentHosts(account);
 
   for (const attachment of attachments) {
     if (!attachment.url) {
@@ -41,12 +139,21 @@ async function resolveGoChatMedia(
     }
 
     try {
-      const fetchResult = await core.channel.media.fetchRemoteMedia({
+      const fetchResult = shouldBypassRemoteMediaSsrf({
         url: attachment.url,
-        ssrfPolicy: account.config.allowPrivateNetwork
-          ? { allowPrivateNetwork: true }
-          : undefined,
-      });
+        trustedHosts,
+      })
+        ? await fetchTrustedRemoteMedia({
+            url: attachment.url,
+            trustedHosts,
+            logger,
+          })
+        : await core.channel.media.fetchRemoteMedia({
+            url: attachment.url,
+            ssrfPolicy: account.config.allowPrivateNetwork
+              ? { allowPrivateNetwork: true }
+              : undefined,
+          });
 
       if (!fetchResult || !fetchResult.buffer) {
         continue;
@@ -68,8 +175,6 @@ async function resolveGoChatMedia(
         });
       }
     } catch (err) {
-      const core2 = getGoChatRuntime();
-      const logger = core2.logging.getChildLogger({ channel: "gochat" });
       logger.warn(
         `[gochat] failed to fetch media ${attachment.url}: ${err instanceof Error ? err.message : String(err)}`,
       );

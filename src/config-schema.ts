@@ -57,6 +57,7 @@ export const GoChatAccountSchemaBase = z
     groupPolicy: GroupPolicySchema.optional().default("allowlist"),
     conversations: z.record(z.string(), GoChatConversationSchema.optional()).optional(),
     allowPrivateNetwork: z.boolean().optional(),
+    trustedAttachmentHosts: z.array(z.string()).optional(),
     directPort: z.number().int().positive().optional(),
     directHost: z.string().optional(),
     relayPlatformUrl: z.string().optional(),

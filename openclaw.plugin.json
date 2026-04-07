@@ -38,6 +38,11 @@
             "type": "string",
             "description": "GoChat relay platform WebSocket URL (auto-configured)"
           },
+          "trustedAttachmentHosts": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Extra trusted hosts for inbound attachment downloads. The relay host is trusted automatically."
+          },
           "channelId": {
             "type": "string",
             "description": "Channel ID from GoChat relay platform (auto-registered)"
