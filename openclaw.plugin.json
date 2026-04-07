@@ -1,0 +1,102 @@
+{
+  "id": "gochat",
+  "kind": "channel",
+  "channels": ["gochat"],
+  "name": "GoChat",
+  "description": "Custom chat backend. Local mode (built-in API, zero config) or relay mode (GoChat platform via WebSocket). Supports text, images, audio, video, and file attachments.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "gochat": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["local", "relay"],
+            "description": "local: built-in API server; relay: WebSocket relay via GoChat platform (default)"
+          },
+          "webhookSecret": {
+            "type": "string",
+            "description": "Webhook signing secret (auto-generated for local mode)"
+          },
+          "allowFrom": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "DM allowlist (sender IDs)"
+          },
+          "dmPolicy": {
+            "type": "string",
+            "enum": ["pairing", "allowlist", "open", "disabled"],
+            "description": "DM access policy (default: open)"
+          },
+          "directPort": {
+            "type": "number",
+            "description": "Port for local mode HTTP server (default: 9750)"
+          },
+          "relayPlatformUrl": {
+            "type": "string",
+            "description": "GoChat relay platform WebSocket URL (auto-configured)"
+          },
+          "trustedAttachmentHosts": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Extra trusted hosts for inbound attachment downloads. The relay host is trusted automatically."
+          },
+          "localAudioTranscription": {
+            "type": "object",
+            "description": "Optional local audio transcription settings for inbound audio attachments.",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Enable local transcription for inbound audio attachments (default: true)"
+              },
+              "engine": {
+                "type": "string",
+                "enum": ["auto", "whisper", "faster-whisper", "mlx-whisper", "whisper-cpp"],
+                "description": "Preferred local transcription engine"
+              },
+              "model": {
+                "type": "string",
+                "description": "Model name such as base, small, medium, or large-v3"
+              },
+              "language": {
+                "type": "string",
+                "description": "Optional language hint such as zh or en"
+              },
+              "task": {
+                "type": "string",
+                "enum": ["transcribe", "translate"],
+                "description": "Transcribe in source language or translate to English"
+              },
+              "device": {
+                "type": "string",
+                "description": "Device hint such as auto, cpu, cuda, or mps"
+              },
+              "computeType": {
+                "type": "string",
+                "description": "Backend-specific compute type, mainly for faster-whisper"
+              },
+              "beamSize": {
+                "type": "number",
+                "description": "Decoder beam size"
+              },
+              "wordTimestamps": {
+                "type": "boolean",
+                "description": "Request word timestamps when supported"
+              },
+              "maxTranscriptChars": {
+                "type": "number",
+                "description": "Maximum transcript characters injected into the agent context"
+              }
+            }
+          },
+          "channelId": {
+            "type": "string",
+            "description": "Channel ID from GoChat relay platform (auto-registered)"
+          }
+        }
+      }
+    }
+  }
+}
