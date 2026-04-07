@@ -184,6 +184,44 @@ function Get-GitCommandPath {
     return $null
 }
 
+function Get-NpmCommandPath {
+    $candidates = @()
+
+    $npmCmd = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
+    if ($npmCmd) {
+        $candidates += $npmCmd.Source
+    }
+
+    $npmExe = Get-Command "npm.exe" -ErrorAction SilentlyContinue
+    if ($npmExe) {
+        $candidates += $npmExe.Source
+    }
+
+    $npm = Get-Command "npm" -ErrorAction SilentlyContinue
+    if ($npm -and $npm.Source) {
+        $candidates += $npm.Source
+    }
+
+    $candidates += @(
+        "${env:ProgramFiles}\nodejs\npm.cmd",
+        "${env:ProgramFiles}\nodejs\npm.exe",
+        "${env:APPDATA}\npm\npm.cmd",
+        "${env:APPDATA}\npm\npm.exe"
+    )
+
+    foreach ($candidate in ($candidates | Where-Object { $_ } | Select-Object -Unique)) {
+        if (-not (Test-Path $candidate)) {
+            continue
+        }
+        $ext = [System.IO.Path]::GetExtension($candidate)
+        if ($ext -in @(".cmd", ".exe", ".bat")) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 function Try-InstallGitWithWinget {
     $winget = Get-Command "winget" -ErrorAction SilentlyContinue
     if (-not $winget) {
@@ -310,8 +348,14 @@ function Install-NpmDependencies {
         return
     }
 
+    $npmBin = Get-NpmCommandPath
+    if (-not $npmBin) {
+        Write-Fail "npm executable not found."
+        exit 1
+    }
+
     Write-Info "Installing npm dependencies..."
-    $npmInstall = Start-Process -FilePath "npm" `
+    $npmInstall = Start-Process -FilePath $npmBin `
         -ArgumentList @("install", "--production") `
         -WorkingDirectory $TargetDir `
         -NoNewWindow `
@@ -381,11 +425,15 @@ function Install-FromGit {
 function Install-FromNpmPack {
     $tmpDir = Join-Path $env:TEMP "gochat-pack-$(Get-Random)"
     New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+    $npmBin = Get-NpmCommandPath
 
     Write-Info "Downloading package from npm: $PACKAGE_NAME"
     Push-Location $tmpDir
     try {
-        $tarballName = (& npm pack $PACKAGE_NAME --silent 2>$null | Select-Object -Last 1).Trim()
+        if (-not $npmBin) {
+            throw "npm executable not found"
+        }
+        $tarballName = (& $npmBin pack $PACKAGE_NAME --silent 2>$null | Select-Object -Last 1).Trim()
         if (-not $tarballName) {
             throw "npm pack returned no tarball"
         }
