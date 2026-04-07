@@ -182,6 +182,7 @@ async function autoRegisterRelay(
         channelId: data.channelId,
         webhookSecret: data.secret,
         enabled: true,
+        blockStreaming: true,
       });
       console.log(`[gochat:setup] relay registered OK: channelId=${data.channelId} relayUrl=${DEFAULT_RELAY_WS_URL}`);
       return nextCfg;
@@ -194,6 +195,7 @@ async function autoRegisterRelay(
   return setGoChatAccountConfig(cfg, accountId, {
     relayPlatformUrl: DEFAULT_RELAY_WS_URL,
     enabled: true,
+    blockStreaming: true,
   });
 }
 
@@ -223,6 +225,7 @@ export const gochatSetupAdapter: ChannelSetupAdapter = {
     const patch: Record<string, unknown> = {
       enabled: true,
       dmPolicy: "open",
+      blockStreaming: true,
     };
 
     if (setupInput.relayPlatformUrl) {

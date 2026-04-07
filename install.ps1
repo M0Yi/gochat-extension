@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.6-plugin.11"
+$VERSION = "2026.4.6-plugin.12"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -362,6 +362,7 @@ function Get-GoChatConfigSnapshot {
         ChannelId = Get-JsonValue $raw "channels.gochat.channelId"
         Secret = Get-JsonValue $raw "channels.gochat.webhookSecret"
         DirectPort = Get-JsonValue $raw "channels.gochat.directPort"
+        BlockStreaming = Get-JsonValue $raw "channels.gochat.blockStreaming"
     }
 }
 
@@ -411,6 +412,7 @@ const next = Object.assign({}, current);
 next.enabled = true;
 next.name = name || current.name || 'OpenClaw GoChat Plugin';
 next.dmPolicy = 'open';
+next.blockStreaming = true;
 if (mode === 'local') {
   next.mode = 'local';
   next.directPort = Number(directPort || 9750);
@@ -592,6 +594,7 @@ function Print-RelayStatus {
         Write-Host "  Secret Key:    (not configured)"
     }
     Write-Host "  DM Policy:     open"
+    Write-Host "  Streaming:     enabled"
     Write-Host ""
 }
 
@@ -613,6 +616,7 @@ function Print-LocalStatus {
         Write-Host "  Secret Key:    (generated automatically)"
     }
     Write-Host "  DM Policy:     open"
+    Write-Host "  Streaming:     enabled"
     Write-Host ""
 }
 

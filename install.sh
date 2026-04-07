@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.6-plugin.11"
+VERSION="2026.4.6-plugin.12"
 EXTENSION_NAME="gochat"
 PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
@@ -502,6 +502,9 @@ configure_gochat() {
   local pair_code="${2:-}"
   local extensions_dir
   extensions_dir="$(get_extensions_dir)"
+  local openclaw_dir
+  openclaw_dir="$(get_openclaw_dir)"
+  local config_file="${openclaw_dir}/openclaw.json"
 
   echo ""
   info "──── GoChat Configuration ────"
@@ -522,6 +525,7 @@ configure_gochat() {
     info "  server:        built-in HTTP API on port 9750"
     info "  dmPolicy:      open"
     info "──────────────────────────"
+    ensure_gochat_install_defaults "${config_file}" "local"
   fi
 
   echo ""
@@ -542,6 +546,26 @@ ensure_config_file() {
   if [ ! -f "${config_file}" ]; then
     printf "{\n}\n" > "${config_file}"
   fi
+}
+
+ensure_gochat_install_defaults() {
+  local config_file="$1"
+  local mode="${2:-relay}"
+
+  ensure_config_file "${config_file}"
+
+  node -e "
+    const fs = require('fs');
+    const c = JSON.parse(fs.readFileSync('${config_file}','utf8'));
+    if (!c.channels) c.channels = {};
+    c.channels.gochat = Object.assign(c.channels.gochat || {}, {
+      enabled: true,
+      mode: '${mode}',
+      dmPolicy: 'open',
+      blockStreaming: true
+    });
+    fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
+  " 2>/dev/null || true
 }
 
 claim_relay_pair_code() {
@@ -618,7 +642,8 @@ claim_relay_pair_code() {
       channelId: '${reg_channel_id}',
       webhookSecret: '${reg_secret}',
       relayPlatformUrl: '${reg_relay_url}',
-      dmPolicy: 'open'
+      dmPolicy: 'open',
+      blockStreaming: true
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || {
@@ -658,6 +683,7 @@ register_relay() {
   if [ -n "${existing_id}" ]; then
     info "Existing channelId: ${existing_id} — skipping registration."
     ensure_dm_policy_open "${config_file}"
+    ensure_gochat_install_defaults "${config_file}" "relay"
     print_credentials
     return 0
   fi
@@ -698,7 +724,8 @@ register_relay() {
       channelId: '${reg_channel_id}',
       webhookSecret: '${reg_secret}',
       relayPlatformUrl: '${RELAY_WS_URL}',
-      dmPolicy: 'open'
+      dmPolicy: 'open',
+      blockStreaming: true
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || {
@@ -716,8 +743,9 @@ ensure_dm_policy_open() {
     const fs = require('fs');
     const c = JSON.parse(fs.readFileSync('${config_file}','utf8'));
     const g = c.channels && c.channels.gochat;
-    if (g && g.dmPolicy !== 'open') {
+    if (g && (g.dmPolicy !== 'open' || g.blockStreaming !== true)) {
       g.dmPolicy = 'open';
+      g.blockStreaming = true;
       fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
     }
   " 2>/dev/null || true

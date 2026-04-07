@@ -70,7 +70,7 @@ function mergeGoChatAccountConfig(
   cfg: CoreConfig,
   accountId: string,
 ): GoChatAccountConfig {
-  return resolveMergedAccountConfig<GoChatAccountConfig>({
+  const merged = resolveMergedAccountConfig<GoChatAccountConfig>({
     channelConfig: cfg.channels?.gochat as GoChatAccountConfig | undefined,
     accounts: cfg.channels?.gochat?.accounts as
       | Record<string, Partial<GoChatAccountConfig>>
@@ -79,6 +79,12 @@ function mergeGoChatAccountConfig(
     omitKeys: ["defaultAccount"],
     normalizeAccountId,
   });
+
+  if (typeof merged.blockStreaming !== "boolean") {
+    merged.blockStreaming = true;
+  }
+
+  return merged;
 }
 
 function resolveGoChatSecret(
@@ -161,7 +167,8 @@ export function resolveGoChatAccount(params: {
       ` secretSource=${secretResolution.source}` +
       (mode === "local" ? ` port=${directPort} host=${directHost}` : "") +
       (mode === "relay" ? ` relayUrl=${relayPlatformUrl} channelId=${channelId || "(pending)"}` : "") +
-      ` dmPolicy=${merged.dmPolicy ?? "open"}`,
+      ` dmPolicy=${merged.dmPolicy ?? "open"}` +
+      ` blockStreaming=${merged.blockStreaming !== false}`,
     );
 
     return resolved;
