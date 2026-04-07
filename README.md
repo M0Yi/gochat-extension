@@ -30,10 +30,18 @@ A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables c
 curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
 ```
 
+```powershell
+& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1')))
+```
+
 Use a 6-digit connection code for zero-config pairing:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash -s -- 123456
+```
+
+```powershell
+& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1'))) -Code '123456'
 ```
 
 ---

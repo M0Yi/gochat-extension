@@ -9,197 +9,64 @@ param(
     [switch]$Help
 )
 
-# ──────────────────────────────────────────────
-# GoChat Extension Installer for OpenClaw
-# Supports: Windows (native), PowerShell 5.1+
-# ──────────────────────────────────────────────
-
 $ErrorActionPreference = "Stop"
+
 $VERSION = "2026.4.6-plugin.9"
 $EXTENSION_NAME = "gochat"
-$PACKAGE_NAME = "@m0yi/gochat"
-$OPENCLAW_MIN_VERSION = "2026.3.28"
-$REPO_URL = "https://github.com/M0Yi/gochat-extension.git"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
 $DEFAULT_RELAY_HTTP_URL = "https://fund.moyi.vip"
 $DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin"
+$DEFAULT_LOCAL_PORT = 9750
 $RELAY_HTTP_URL = if ($env:GOCHAT_RELAY_HTTP_URL) { $env:GOCHAT_RELAY_HTTP_URL } else { $DEFAULT_RELAY_HTTP_URL }
 $RELAY_WS_URL = if ($env:GOCHAT_RELAY_WS_URL) { $env:GOCHAT_RELAY_WS_URL } else { $DEFAULT_RELAY_WS_URL }
 
-$Script:Platform = ""
-$Script:Arch = ""
+$Script:Platform = "windows"
+$Script:Arch = "unknown"
 $Script:OpenClawBin = ""
+$Script:OpenClawVersion = ""
 $Script:NodeVersion = ""
-
-# ──────────────────────────────────────────────
-# Logging
-# ──────────────────────────────────────────────
+$Script:NpmBin = ""
 
 function Write-Info($msg)  { Write-Host "`e[36;1m[gochat]`e[0m $msg" }
 function Write-Ok($msg)    { Write-Host "`e[32;1m[gochat]`e[0m $msg" }
 function Write-Warn($msg)  { Write-Host "`e[33;1m[gochat]`e[0m $msg" }
 function Write-Fail($msg)  { Write-Host "`e[31;1m[gochat]`e[0m $msg" }
 
-# ──────────────────────────────────────────────
-# JSON helper via Node.js
-# ──────────────────────────────────────────────
+function Exit-WithError {
+    param([string]$Message)
+    Write-Fail $Message
+    exit 1
+}
 
 function Get-JsonValue {
     param([string]$JsonData, [string]$Key)
     try {
-        $result = & node -e "const a=process.argv.slice(1),k=a[0],d=JSON.parse(a[1]);let v=d;for(const s of k.split('.')){if(v==null||v[s]===undefined){v=null;break}v=v[s]}if(v!==null&&v!==undefined)process.stdout.write(String(v))" $Key $JsonData 2>$null
-        return $result
+        return (& node -e "const a=process.argv.slice(1),k=a[0],d=JSON.parse(a[1]);let v=d;for(const s of k.split('.')){if(v==null||v[s]===undefined){v=null;break}v=v[s]}if(v!==null&&v!==undefined)process.stdout.write(String(v))" $Key $JsonData 2>$null)
     } catch {
         return ""
     }
 }
 
-# ──────────────────────────────────────────────
-# OS & Architecture Detection
-# ──────────────────────────────────────────────
-
 function Detect-Platform {
-    $Script:Platform = "windows"
-
     $cpu = $env:PROCESSOR_ARCHITECTURE
-    if ($cpu -match "AMD64|X64") { $Script:Arch = "amd64" }
-    elseif ($cpu -match "ARM64") { $Script:Arch = "arm64" }
-    else { $Script:Arch = "unknown" }
+    if ($cpu -match "AMD64|X64") {
+        $Script:Arch = "amd64"
+    } elseif ($cpu -match "ARM64") {
+        $Script:Arch = "arm64"
+    }
 
     Write-Info "Platform: $($Script:Platform) ($($Script:Arch))"
-}
-
-# ──────────────────────────────────────────────
-# Detect OpenClaw
-# ──────────────────────────────────────────────
-
-function Detect-OpenClaw {
-    $oc = Get-Command "openclaw" -ErrorAction SilentlyContinue
-    if ($oc) {
-        $Script:OpenClawBin = $oc.Source
-        Write-Info "Found OpenClaw at: $($Script:OpenClawBin)"
-        return $true
-    }
-
-    $searchPaths = @(
-        "$env:USERPROFILE\.local\bin\openclaw.exe",
-        "$env:USERPROFILE\.local\bin\openclaw.cmd",
-        "$env:APPDATA\npm\openclaw.cmd",
-        "$env:APPDATA\npm\openclaw.ps1",
-        "${env:ProgramFiles}\openclaw\bin\openclaw.exe",
-        "${env:LocalAppData}\openclaw\bin\openclaw.exe"
-    )
-
-    foreach ($p in $searchPaths) {
-        if (Test-Path $p) {
-            $Script:OpenClawBin = $p
-            Write-Info "Found OpenClaw at: $p"
-            return $true
-        }
-    }
-
-    $npmPrefix = Get-Command "npm" -ErrorAction SilentlyContinue
-    if ($npmPrefix) {
-        $prefix = & npm config get prefix 2>$null
-        if ($prefix) {
-            $npmOc = Join-Path $prefix "openclaw.cmd"
-            if (Test-Path $npmOc) {
-                $Script:OpenClawBin = $npmOc
-                Write-Info "Found OpenClaw at: $npmOc"
-                return $true
-            }
-        }
-    }
-
-    return $false
-}
-
-function Get-OpenClawDir {
-    if ($env:OPENCLAW_STATE_DIR) {
-        return $env:OPENCLAW_STATE_DIR
-    }
-    return Join-Path $env:USERPROFILE ".openclaw"
-}
-
-function Get-ExtensionsDir {
-    return Join-Path (Get-OpenClawDir) "extensions"
-}
-
-# ──────────────────────────────────────────────
-# Ensure directory is writable
-# ──────────────────────────────────────────────
-
-function Ensure-DirWritable {
-    param([string]$TargetDir)
-    try {
-        if (-not (Test-Path $TargetDir)) {
-            New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-        }
-        $testFile = Join-Path $TargetDir ".write-test-$([guid]::NewGuid().ToString('n').Substring(0,8))"
-        Set-Content -Path $testFile -Value "test" -ErrorAction Stop
-        Remove-Item $testFile -Force
-    } catch {
-        Write-Fail "Directory not writable: $TargetDir"
-        Write-Fail "Try running as Administrator or check permissions."
-        exit 1
-    }
-}
-
-# ──────────────────────────────────────────────
-# Git bootstrap
-# ──────────────────────────────────────────────
-
-function Refresh-SessionPath {
-    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $currentPath = $env:Path
-    $parts = @($currentPath, $machinePath, $userPath) | Where-Object { $_ }
-    if ($parts.Count -gt 0) {
-        $env:Path = (($parts -join ";").Split(";") | Where-Object { $_ } | Select-Object -Unique) -join ";"
-    }
-}
-
-function Get-GitCommandPath {
-    $git = Get-Command "git" -ErrorAction SilentlyContinue
-    if ($git) {
-        return $git.Source
-    }
-
-    $candidates = @(
-        "${env:ProgramFiles}\Git\cmd\git.exe",
-        "${env:ProgramFiles}\Git\bin\git.exe",
-        "${env:LocalAppData}\Programs\Git\cmd\git.exe",
-        "${env:LocalAppData}\Programs\Git\bin\git.exe",
-        "${env:ProgramData}\chocolatey\bin\git.exe",
-        "$env:USERPROFILE\scoop\shims\git.exe"
-    )
-
-    foreach ($candidate in $candidates) {
-        if ($candidate -and (Test-Path $candidate)) {
-            return $candidate
-        }
-    }
-
-    return $null
 }
 
 function Get-NpmCommandPath {
     $candidates = @()
 
-    $npmCmd = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
-    if ($npmCmd) {
-        $candidates += $npmCmd.Source
-    }
-
-    $npmExe = Get-Command "npm.exe" -ErrorAction SilentlyContinue
-    if ($npmExe) {
-        $candidates += $npmExe.Source
-    }
-
-    $npm = Get-Command "npm" -ErrorAction SilentlyContinue
-    if ($npm -and $npm.Source) {
-        $candidates += $npm.Source
+    foreach ($name in @("npm.cmd", "npm.exe", "npm")) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd -and $cmd.Source) {
+            $candidates += $cmd.Source
+        }
     }
 
     $candidates += @(
@@ -222,291 +89,331 @@ function Get-NpmCommandPath {
     return $null
 }
 
-function Try-InstallGitWithWinget {
-    $winget = Get-Command "winget" -ErrorAction SilentlyContinue
-    if (-not $winget) {
-        return $false
+function Detect-OpenClaw {
+    $oc = Get-Command "openclaw" -ErrorAction SilentlyContinue
+    if ($oc) {
+        $Script:OpenClawBin = $oc.Source
+        return $true
     }
 
-    Write-Info "Attempting to install git via winget..."
-    try {
-        & $winget.Source install --id Git.Git -e --source winget --scope user --silent --accept-package-agreements --accept-source-agreements
-        return ($LASTEXITCODE -eq 0)
-    } catch {
-        return $false
+    $paths = @(
+        "$env:USERPROFILE\.local\bin\openclaw.exe",
+        "$env:USERPROFILE\.local\bin\openclaw.cmd",
+        "$env:APPDATA\npm\openclaw.cmd",
+        "$env:APPDATA\npm\openclaw.ps1",
+        "${env:ProgramFiles}\openclaw\bin\openclaw.exe",
+        "${env:LocalAppData}\openclaw\bin\openclaw.exe"
+    )
+
+    foreach ($path in $paths) {
+        if (Test-Path $path) {
+            $Script:OpenClawBin = $path
+            return $true
+        }
     }
+
+    return $false
 }
 
-function Try-InstallGitWithScoop {
-    $scoop = Get-Command "scoop" -ErrorAction SilentlyContinue
-    if (-not $scoop) {
-        return $false
+function Ensure-Prerequisites {
+    $node = Get-Command "node" -ErrorAction SilentlyContinue
+    if (-not $node) {
+        Exit-WithError "Node.js is required but was not found. Install Node.js first: https://nodejs.org/"
     }
 
-    Write-Info "Attempting to install git via scoop..."
-    try {
-        & $scoop.Source install git
-        return ($LASTEXITCODE -eq 0)
-    } catch {
-        return $false
-    }
-}
-
-function Try-InstallGitWithChoco {
-    $choco = Get-Command "choco" -ErrorAction SilentlyContinue
-    if (-not $choco) {
-        return $false
+    $Script:NpmBin = Get-NpmCommandPath
+    if (-not $Script:NpmBin) {
+        Exit-WithError "npm is required but was not found. Reinstall Node.js or ensure npm.cmd is on PATH."
     }
 
-    Write-Info "Attempting to install git via Chocolatey..."
-    try {
-        & $choco.Source install git -y --no-progress
-        return ($LASTEXITCODE -eq 0)
-    } catch {
-        return $false
-    }
-}
+    $Script:NodeVersion = & node --version 2>$null
+    Write-Info "Node.js: $($Script:NodeVersion)"
 
-function Ensure-GitInstalled {
-    $gitPath = Get-GitCommandPath
-    if ($gitPath) {
-        return $gitPath
-    }
-
-    Write-Warn "git not found. Attempting automatic installation..."
-
-    $installed = $false
-    if (Try-InstallGitWithWinget) {
-        $installed = $true
-    } elseif (Try-InstallGitWithScoop) {
-        $installed = $true
-    } elseif (Try-InstallGitWithChoco) {
-        $installed = $true
-    }
-
-    Refresh-SessionPath
-    $gitPath = Get-GitCommandPath
-    if ($gitPath) {
-        Write-Ok "git installed successfully: $gitPath"
-        return $gitPath
-    }
-
-    if ($installed) {
-        Write-Warn "git installation finished, but git is not yet visible in this PowerShell session."
+    if (Detect-OpenClaw) {
+        Write-Info "Found OpenClaw at: $($Script:OpenClawBin)"
+        $Script:OpenClawVersion = & $Script:OpenClawBin --version 2>$null | Select-Object -First 1
+        if ($Script:OpenClawVersion) {
+            Write-Info "OpenClaw version: $($Script:OpenClawVersion)"
+        }
     } else {
-        Write-Warn "Automatic git installation was unavailable."
+        Write-Warn "OpenClaw CLI not found. The extension will install, but OpenClaw must be installed before use."
     }
-
-    return $null
 }
 
-# ──────────────────────────────────────────────
-# Install functions
-# ──────────────────────────────────────────────
-
-function Install-FromTarball {
-    param([string]$Tarball)
-
-    $extDir = Get-ExtensionsDir
-    Ensure-DirWritable $extDir
-
-    $target = Join-Path $extDir $EXTENSION_NAME
-    if (Test-Path $target) {
-        Write-Info "Removing previous installation..."
-        Remove-Item $target -Recurse -Force
+function Get-OpenClawDir {
+    if ($env:OPENCLAW_STATE_DIR) {
+        return $env:OPENCLAW_STATE_DIR
     }
+    return Join-Path $env:USERPROFILE ".openclaw"
+}
 
-    Write-Info "Extracting to $target..."
+function Get-ExtensionsDir {
+    return Join-Path (Get-OpenClawDir) "extensions"
+}
 
-    $tmpExtract = Join-Path $env:TEMP "gochat-extract-$(Get-Random)"
-    New-Item -ItemType Directory -Path $tmpExtract -Force | Out-Null
+function Ensure-DirWritable {
+    param([string]$TargetDir)
 
-    tar -xzf $Tarball -C $tmpExtract 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Fail "Failed to extract tarball."
-        Remove-Item $tmpExtract -Recurse -Force -ErrorAction SilentlyContinue
-        exit 1
+    try {
+        if (-not (Test-Path $TargetDir)) {
+            New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+        }
+        $testFile = Join-Path $TargetDir ".write-test-$([guid]::NewGuid().ToString('n').Substring(0,8))"
+        Set-Content -Path $testFile -Value "ok" -ErrorAction Stop
+        Remove-Item $testFile -Force
+    } catch {
+        Exit-WithError "Directory not writable: $TargetDir"
     }
+}
 
-    $extracted = Get-ChildItem $tmpExtract -Directory | Select-Object -First 1
-    if ($extracted) {
-        Move-Item $extracted.FullName $target -Force
-    } else {
-        Move-Item $tmpExtract $target -Force
+function Remove-DirIfExists {
+    param([string]$PathToRemove)
+
+    if (Test-Path $PathToRemove) {
+        Remove-Item $PathToRemove -Recurse -Force -ErrorAction Stop
     }
-
-    Install-NpmDependencies $target
-
-    Write-Ok "Installed to $target"
 }
 
 function Install-NpmDependencies {
     param([string]$TargetDir)
 
-    $pkgJson = Join-Path $TargetDir "package.json"
-    if (-not (Test-Path $pkgJson)) {
-        return
-    }
-
-    $npmBin = Get-NpmCommandPath
-    if (-not $npmBin) {
-        Write-Fail "npm executable not found."
-        exit 1
+    if (-not (Test-Path (Join-Path $TargetDir "package.json"))) {
+        Exit-WithError "package.json not found in installed extension directory."
     }
 
     Write-Info "Installing npm dependencies..."
-    $npmInstall = Start-Process -FilePath $npmBin `
-        -ArgumentList @("install", "--production") `
-        -WorkingDirectory $TargetDir `
-        -NoNewWindow `
-        -Wait `
-        -PassThru
-    if ($npmInstall.ExitCode -ne 0) {
-        Write-Fail "npm install failed."
-        exit 1
+    & $Script:NpmBin install --omit=dev
+    if ($LASTEXITCODE -ne 0) {
+        Exit-WithError "npm install failed."
     }
 }
 
 function Install-FromSource {
     param([string]$SourceDir)
 
-    $extDir = Get-ExtensionsDir
-    Ensure-DirWritable $extDir
+    $extensionsDir = Get-ExtensionsDir
+    $target = Join-Path $extensionsDir $EXTENSION_NAME
+    Ensure-DirWritable $extensionsDir
 
-    $target = Join-Path $extDir $EXTENSION_NAME
     if (Test-Path $target) {
         Write-Info "Removing previous installation..."
-        Remove-Item $target -Recurse -Force
+        Remove-DirIfExists $target
     }
 
+    New-Item -ItemType Directory -Path $target -Force | Out-Null
     Write-Info "Copying to $target..."
-    Copy-Item $SourceDir $target -Recurse -Force
 
-    $nodeModules = Join-Path $target "node_modules"
-    if (Test-Path $nodeModules) { Remove-Item $nodeModules -Recurse -Force -ErrorAction SilentlyContinue }
-    $gitDir = Join-Path $target ".git"
-    if (Test-Path $gitDir) { Remove-Item $gitDir -Recurse -Force -ErrorAction SilentlyContinue }
+    Get-ChildItem -LiteralPath $SourceDir -Force | ForEach-Object {
+        if ($_.Name -in @(".git", "node_modules")) {
+            return
+        }
+        Copy-Item -LiteralPath $_.FullName -Destination $target -Recurse -Force
+    }
 
-    Install-NpmDependencies $target
+    Push-Location $target
+    try {
+        Install-NpmDependencies $target
+    } finally {
+        Pop-Location
+    }
 
     Write-Ok "Installed to $target"
 }
 
-function Install-FromGit {
-    param([string]$GitBin = "")
+function Install-FromTarball {
+    param([string]$TarballPath)
 
-    $tmpDir = Join-Path $env:TEMP "gochat-install-$(Get-Random)"
+    $extensionsDir = Get-ExtensionsDir
+    $target = Join-Path $extensionsDir $EXTENSION_NAME
+    Ensure-DirWritable $extensionsDir
 
-    if (-not $GitBin) {
-        $GitBin = Ensure-GitInstalled
-    }
-    if (-not $GitBin) {
-        Write-Fail "git is required for repository install but could not be installed automatically."
-        Write-Fail "Install git: https://git-scm.com/download/win"
-        exit 1
+    if (Test-Path $target) {
+        Write-Info "Removing previous installation..."
+        Remove-DirIfExists $target
     }
 
-    Write-Info "Cloning from $REPO_URL..."
-    $gitClone = Start-Process -FilePath $GitBin `
-        -ArgumentList @("clone", "--depth", "1", "--quiet", $REPO_URL, $tmpDir) `
-        -NoNewWindow `
-        -Wait `
-        -PassThru
-    if ($gitClone.ExitCode -ne 0) {
-        Write-Fail "git clone failed. Check network connection."
-        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
-        exit 1
+    $tar = Get-Command "tar" -ErrorAction SilentlyContinue
+    if (-not $tar) {
+        Exit-WithError "tar is required to extract the installer payload on Windows."
     }
 
-    Install-FromSource $tmpDir
-    Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
-}
+    $extractDir = Join-Path $env:TEMP "gochat-extract-$(Get-Random)"
+    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
 
-function Install-FromNpmPack {
-    $tmpDir = Join-Path $env:TEMP "gochat-pack-$(Get-Random)"
-    New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
-    $npmBin = Get-NpmCommandPath
-
-    Write-Info "Downloading package from npm: $PACKAGE_NAME"
-    Push-Location $tmpDir
+    Write-Info "Extracting to $target..."
     try {
-        if (-not $npmBin) {
-            throw "npm executable not found"
-        }
-        $tarballName = (& $npmBin pack $PACKAGE_NAME --silent 2>$null | Select-Object -Last 1).Trim()
-        if (-not $tarballName) {
-            throw "npm pack returned no tarball"
+        & $tar.Source -xzf $TarballPath -C $extractDir
+        if ($LASTEXITCODE -ne 0) {
+            Exit-WithError "Failed to extract installer payload."
         }
 
-        $tarballPath = Join-Path $tmpDir $tarballName
-        if (-not (Test-Path $tarballPath)) {
-            throw "tarball not found after npm pack: $tarballPath"
+        $rootDir = Get-ChildItem -LiteralPath $extractDir -Directory | Select-Object -First 1
+        if (-not $rootDir) {
+            Exit-WithError "Installer payload was empty after extraction."
         }
 
-        Install-FromTarball $tarballPath
-    } catch {
-        Write-Fail "npm package install failed. Check npm registry access."
-        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
-        exit 1
+        Move-Item -LiteralPath $rootDir.FullName -Destination $target -Force
+
+        Push-Location $target
+        try {
+            Install-NpmDependencies $target
+        } finally {
+            Pop-Location
+        }
     } finally {
-        Pop-Location
-        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-DirIfExists $extractDir
     }
-}
 
-function Install-FromGitHubTarball {
-    $tmpDir = Join-Path $env:TEMP "gochat-download-$(Get-Random)"
-    $tarballPath = Join-Path $tmpDir "gochat-extension.tar.gz"
-    New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
-
-    Write-Info "Downloading GitHub source tarball..."
-    try {
-        Invoke-WebRequest -Uri $REPO_TARBALL_URL -OutFile $tarballPath -UseBasicParsing -ErrorAction Stop
-        Install-FromTarball $tarballPath
-        return $true
-    } catch {
-        Write-Warn "GitHub source tarball download failed. Check network connection."
-        return $false
-    } finally {
-        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
+    Write-Ok "Installed to $target"
 }
 
 function Install-Remote {
-    $gitPath = Ensure-GitInstalled
-    if ($gitPath) {
-        Install-FromGit -GitBin $gitPath
-        return
+    $downloadDir = Join-Path $env:TEMP "gochat-download-$(Get-Random)"
+    $tarballPath = Join-Path $downloadDir "gochat-extension.tar.gz"
+    New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+
+    Write-Info "Downloading installer payload from GitHub..."
+    try {
+        $requestParams = @{
+            Uri = $REPO_TARBALL_URL
+            OutFile = $tarballPath
+            ErrorAction = "Stop"
+        }
+        $iwr = Get-Command "Invoke-WebRequest" -ErrorAction Stop
+        if ($iwr.Parameters.ContainsKey("UseBasicParsing")) {
+            $requestParams.UseBasicParsing = $true
+        }
+        Invoke-WebRequest @requestParams
+    } catch {
+        Exit-WithError "Failed to download installer payload from GitHub. Check network access."
+    } finally {
+        if (-not (Test-Path $tarballPath)) {
+            Remove-DirIfExists $downloadDir
+        }
     }
 
-    Write-Warn "Falling back to GitHub source tarball..."
-    if (Install-FromGitHubTarball) {
-        return
+    try {
+        Install-FromTarball $tarballPath
+    } finally {
+        Remove-DirIfExists $downloadDir
     }
-
-    Write-Warn "Falling back to npm package install..."
-    Install-FromNpmPack
 }
-
-# ──────────────────────────────────────────────
-# Configuration
-# ──────────────────────────────────────────────
 
 function Ensure-ConfigFile {
     param([string]$ConfigFile)
-    $dir = Split-Path $ConfigFile -Parent
-    if (-not (Test-Path $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+
+    $configDir = Split-Path $ConfigFile -Parent
+    if (-not (Test-Path $configDir)) {
+        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
     }
     if (-not (Test-Path $ConfigFile)) {
-        Set-Content -Path $ConfigFile -Value "{`n}"
+        Set-Content -Path $ConfigFile -Value "{`n}`n"
+    }
+}
+
+function Get-GoChatConfigSnapshot {
+    param([string]$ConfigFile)
+
+    if (-not (Test-Path $ConfigFile)) {
+        return [pscustomobject]@{
+            Name = ""
+            Mode = ""
+            RelayUrl = ""
+            ChannelId = ""
+            Secret = ""
+            DirectPort = ""
+        }
+    }
+
+    $raw = Get-Content -Path $ConfigFile -Raw
+    return [pscustomobject]@{
+        Name = Get-JsonValue $raw "channels.gochat.name"
+        Mode = Get-JsonValue $raw "channels.gochat.mode"
+        RelayUrl = Get-JsonValue $raw "channels.gochat.relayPlatformUrl"
+        ChannelId = Get-JsonValue $raw "channels.gochat.channelId"
+        Secret = Get-JsonValue $raw "channels.gochat.webhookSecret"
+        DirectPort = Get-JsonValue $raw "channels.gochat.directPort"
+    }
+}
+
+function Get-DefaultDeviceName {
+    $snapshot = Get-GoChatConfigSnapshot (Join-Path (Get-OpenClawDir) "openclaw.json")
+    if ($snapshot.Name) {
+        return $snapshot.Name
+    }
+    if ($env:COMPUTERNAME) {
+        return "$($env:COMPUTERNAME)"
+    }
+    return "OpenClaw GoChat Plugin"
+}
+
+function New-RandomSecret {
+    return ([guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")).Substring(0, 48)
+}
+
+function Write-GoChatConfig {
+    param(
+        [string]$ConfigFile,
+        [string]$Mode,
+        [string]$Name,
+        [string]$RelayUrl = "",
+        [string]$ChannelId = "",
+        [string]$Secret = "",
+        [string]$DirectPort = ""
+    )
+
+    Ensure-ConfigFile $ConfigFile
+
+    & node -e @"
+const fs = require('fs');
+const configFile = process.argv[1];
+const mode = process.argv[2];
+const name = process.argv[3];
+const relayUrl = process.argv[4];
+const channelId = process.argv[5];
+const secret = process.argv[6];
+const directPort = process.argv[7];
+let cfg = {};
+try { cfg = JSON.parse(fs.readFileSync(configFile, 'utf8')); } catch {}
+if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) cfg = {};
+if (!cfg.channels || typeof cfg.channels !== 'object' || Array.isArray(cfg.channels)) cfg.channels = {};
+const current = cfg.channels.gochat && typeof cfg.channels.gochat === 'object' ? cfg.channels.gochat : {};
+const next = Object.assign({}, current);
+next.enabled = true;
+next.name = name || current.name || 'OpenClaw GoChat Plugin';
+next.dmPolicy = 'open';
+if (mode === 'local') {
+  next.mode = 'local';
+  next.directPort = Number(directPort || 9750);
+  next.webhookSecret = secret || current.webhookSecret || '';
+  delete next.channelId;
+  delete next.relayPlatformUrl;
+} else {
+  next.mode = 'relay';
+  next.relayPlatformUrl = relayUrl || current.relayPlatformUrl || '';
+  if (channelId) next.channelId = channelId;
+  if (secret) next.webhookSecret = secret;
+  if (!next.channelId) delete next.channelId;
+  if (!next.webhookSecret) delete next.webhookSecret;
+  delete next.directPort;
+}
+cfg.channels.gochat = next;
+fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2) + '\n');
+"@ $ConfigFile $Mode $Name $RelayUrl $ChannelId $Secret $DirectPort 2>$null
+
+    if ($LASTEXITCODE -ne 0) {
+        Exit-WithError "Failed to write OpenClaw config."
     }
 }
 
 function Get-HttpErrorBody {
-    param([Parameter(ValueFromPipeline = $true)]$ErrorRecord)
+    param($ErrorRecord)
 
     try {
+        if ($ErrorRecord.ErrorDetails -and $ErrorRecord.ErrorDetails.Message) {
+            return [string]$ErrorRecord.ErrorDetails.Message
+        }
+
         $response = $ErrorRecord.Exception.Response
         if (-not $response) {
             return ""
@@ -527,8 +434,11 @@ function Get-HttpErrorBody {
     }
 }
 
-function Resolve-ClaimErrorMessage {
-    param($ErrorRecord)
+function Resolve-ApiErrorMessage {
+    param(
+        [string]$Action,
+        $ErrorRecord
+    )
 
     $statusCode = $null
     try {
@@ -538,297 +448,223 @@ function Resolve-ClaimErrorMessage {
     } catch {
     }
 
-    $responseBody = Get-HttpErrorBody $ErrorRecord
-    $combined = (($responseBody + " " + $ErrorRecord.Exception.Message).Trim()).ToLowerInvariant()
+    $body = Get-HttpErrorBody $ErrorRecord
+    $serverError = ""
+    if ($body) {
+        $serverError = Get-JsonValue $body "error"
+    }
+    if ($serverError) {
+        if ($serverError -eq "pair code expired") {
+            return "Connection code expired. Generate a fresh 6-digit code and try again."
+        }
+        if ($serverError -eq "pair code already used") {
+            return "Connection code was already used. Generate a fresh 6-digit code and try again."
+        }
+        if ($serverError -eq "pair code not found") {
+            return "Connection code was not found. Double-check the 6-digit code or generate a new one."
+        }
+        return "$Action failed: $serverError"
+    }
 
-    if ($combined -match "pair code expired") {
-        return "Connection code expired. Generate a fresh 6-digit code and try again."
-    }
-    if ($combined -match "pair code already used") {
-        return "Connection code was already used. Generate a fresh 6-digit code and try again."
-    }
-    if ($combined -match "pair code not found") {
-        return "Connection code was not found. Double-check the 6-digit code or generate a new one."
-    }
-    if ($statusCode -eq 409) {
-        return "Connection code was already used. Generate a fresh 6-digit code and try again."
-    }
-    if ($statusCode -eq 404) {
-        return "Connection code was not found. Double-check the 6-digit code or generate a new one."
-    }
-    if ($statusCode -eq 400) {
-        return "Connection code is invalid or expired. Generate a fresh 6-digit code and try again."
-    }
     if ($statusCode) {
-        return "Failed to claim connection code (HTTP $statusCode). Check the code and network, then try again."
+        return "$Action failed (HTTP $statusCode)."
     }
 
-    return "Failed to claim connection code. Check the code and network, then try again."
+    return "$Action failed: $($ErrorRecord.Exception.Message)"
 }
 
-function Write-ConfigWithNode {
+function Invoke-RelayJson {
     param(
-        [string]$ConfigFile,
-        [string]$ChannelId,
-        [string]$Secret,
-        [string]$RelayUrl,
-        [string]$Name = ""
+        [string]$Path,
+        [hashtable]$Body,
+        [int]$TimeoutSec = 15
     )
 
-    $nameArg = if ($Name) { $Name } else { "OpenClaw GoChat Plugin" }
-    $relayArg = if ($RelayUrl) { $RelayUrl } else { $RELAY_WS_URL }
-
-    & node -e @"
-        const fs = require('fs');
-        const configFile = process.argv[1];
-        const channelId = process.argv[2];
-        const secret = process.argv[3];
-        const relayUrl = process.argv[4];
-        const name = process.argv[5];
-        let c = {};
-        try { c = JSON.parse(fs.readFileSync(configFile, 'utf8')); } catch {}
-        if (!c.channels) c.channels = {};
-        c.channels.gochat = Object.assign(c.channels.gochat || {}, {
-            enabled: true,
-            mode: 'relay',
-            name: name,
-            channelId: channelId,
-            webhookSecret: secret,
-            relayPlatformUrl: relayUrl,
-            dmPolicy: 'open'
-        });
-        fs.writeFileSync(configFile, JSON.stringify(c, null, 2) + '\n');
-"@ $ConfigFile $ChannelId $Secret $relayArg $nameArg 2>$null
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to write config"
-    }
+    return Invoke-RestMethod -Uri ($RELAY_HTTP_URL + $Path) `
+        -Method POST `
+        -ContentType "application/json" `
+        -Body ($Body | ConvertTo-Json -Compress) `
+        -TimeoutSec $TimeoutSec `
+        -ErrorAction Stop
 }
 
-function Claim-RelayPairCode {
-    param([string]$ConfigFile, [string]$PairCode)
-
-    Ensure-ConfigFile $ConfigFile
+function Claim-ConnectionCode {
+    param([string]$PairCode, [string]$DeviceName)
 
     Write-Info "Claiming connection code $PairCode..."
     try {
-        $body = @{ code = $PairCode; name = "OpenClaw GoChat Plugin" } | ConvertTo-Json -Compress
-        $response = Invoke-RestMethod -Uri "$RELAY_HTTP_URL/api/plugin/pair/claim" `
-            -Method POST `
-            -ContentType "application/json" `
-            -Body $body `
-            -TimeoutSec 20 `
-            -ErrorAction Stop
+        $response = Invoke-RelayJson -Path "/api/plugin/pair/claim" -Body @{
+            code = $PairCode
+            name = $DeviceName
+        } -TimeoutSec 20
     } catch {
-        Write-Fail (Resolve-ClaimErrorMessage $_)
-        exit 1
+        Exit-WithError (Resolve-ApiErrorMessage "Claim connection code" $_)
     }
 
-    $regChannelId = Get-JsonValue ($response | ConvertTo-Json -Depth 10 -Compress) "channelId"
-    $regSecret = Get-JsonValue ($response | ConvertTo-Json -Depth 10 -Compress) "secret"
-    $regName = Get-JsonValue ($response | ConvertTo-Json -Depth 10 -Compress) "name"
-    $regRelayUrl = Get-JsonValue ($response | ConvertTo-Json -Depth 10 -Compress) "relayPlatformUrl"
-
-    if (-not $regChannelId -or -not $regSecret) {
-        Write-Fail "Connection code response missing channelId or secret."
-        exit 1
+    if (-not $response.channelId -or -not $response.secret) {
+        $raw = $response | ConvertTo-Json -Depth 10 -Compress
+        Exit-WithError ("Claim connection code returned an unexpected response: " + $raw)
     }
 
-    if (-not $regRelayUrl) { $regRelayUrl = $RELAY_WS_URL }
-
-    Write-Ok "Connection code accepted. channelId=$regChannelId"
-
-    Write-Info "Writing config..."
-    try {
-        Write-ConfigWithNode -ConfigFile $ConfigFile -ChannelId $regChannelId -Secret $regSecret -RelayUrl $regRelayUrl -Name $regName
-        Write-Ok "Config saved."
-    } catch {
-        Write-Fail "Failed to write config."
-        exit 1
+    return [pscustomobject]@{
+        ChannelId = [string]$response.channelId
+        Secret = [string]$response.secret
+        Name = [string]$response.name
+        RelayUrl = if ($response.relayPlatformUrl) { [string]$response.relayPlatformUrl } else { $RELAY_WS_URL }
     }
-
-    Print-Credentials
 }
 
-function Register-Relay {
-    param([string]$PairCode = "")
+function Try-RegisterRelay {
+    param([string]$DeviceName)
 
-    $ocDir = Get-OpenClawDir
-    $configFile = Join-Path $ocDir "openclaw.json"
+    Write-Info "Registering relay channel..."
+    try {
+        $response = Invoke-RelayJson -Path "/api/plugin/register" -Body @{
+            name = $DeviceName
+        }
+    } catch {
+        Write-Warn (Resolve-ApiErrorMessage "Relay registration" $_)
+        return $null
+    }
+
+    if (-not $response.channelId -or -not $response.secret) {
+        Write-Warn "Relay registration returned an unexpected response."
+        return $null
+    }
+
+    return [pscustomobject]@{
+        ChannelId = [string]$response.channelId
+        Secret = [string]$response.secret
+        Name = $DeviceName
+        RelayUrl = $RELAY_WS_URL
+    }
+}
+
+function Print-RelayStatus {
+    param([string]$ConfigFile)
+
+    $snapshot = Get-GoChatConfigSnapshot $ConfigFile
+
+    Write-Host ""
+    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
+    Write-Host "`e[36;1m  GoChat Relay Status`e[0m"
+    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
+    Write-Host "  Config File:   $ConfigFile"
+    Write-Host "  Mode:          relay"
+    Write-Host "  Relay URL:     $($snapshot.RelayUrl)"
+    if ($snapshot.ChannelId) {
+        Write-Host "  Channel ID:    `e[32m$($snapshot.ChannelId)`e[0m"
+    } else {
+        Write-Host "  Channel ID:    (not configured)"
+    }
+    if ($snapshot.Secret) {
+        Write-Host "  Secret Key:    `e[32m$($snapshot.Secret)`e[0m"
+    } else {
+        Write-Host "  Secret Key:    (not configured)"
+    }
+    Write-Host "  DM Policy:     open"
+    Write-Host ""
+}
+
+function Print-LocalStatus {
+    param([string]$ConfigFile)
+
+    $snapshot = Get-GoChatConfigSnapshot $ConfigFile
+
+    Write-Host ""
+    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
+    Write-Host "`e[36;1m  GoChat Local Status`e[0m"
+    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
+    Write-Host "  Config File:   $ConfigFile"
+    Write-Host "  Mode:          local"
+    Write-Host "  Local Port:    $($snapshot.DirectPort)"
+    if ($snapshot.Secret) {
+        Write-Host "  Secret Key:    `e[32m$($snapshot.Secret)`e[0m"
+    } else {
+        Write-Host "  Secret Key:    (generated automatically)"
+    }
+    Write-Host "  DM Policy:     open"
+    Write-Host ""
+}
+
+function Configure-Relay {
+    param([string]$PairCode)
+
+    $configFile = Join-Path (Get-OpenClawDir) "openclaw.json"
+    $snapshot = Get-GoChatConfigSnapshot $configFile
+    $deviceName = if ($snapshot.Name) { $snapshot.Name } else { Get-DefaultDeviceName }
 
     if ($PairCode) {
-        Claim-RelayPairCode $configFile $PairCode
+        $claimed = Claim-ConnectionCode -PairCode $PairCode -DeviceName $deviceName
+        Write-GoChatConfig -ConfigFile $configFile -Mode "relay" -Name $claimed.Name -RelayUrl $claimed.RelayUrl -ChannelId $claimed.ChannelId -Secret $claimed.Secret
+        Write-Ok "Connection code accepted. channelId=$($claimed.ChannelId)"
+        Print-RelayStatus $configFile
         return
     }
 
-    if (-not (Test-Path $configFile)) {
-        Write-Warn "Config not found ($configFile). Will register on first gateway start."
+    if ($snapshot.ChannelId -and $snapshot.Secret) {
+        Write-GoChatConfig -ConfigFile $configFile -Mode "relay" -Name $deviceName -RelayUrl $(if ($snapshot.RelayUrl) { $snapshot.RelayUrl } else { $RELAY_WS_URL }) -ChannelId $snapshot.ChannelId -Secret $snapshot.Secret
+        Write-Info "Existing relay credentials found. Keeping channelId=$($snapshot.ChannelId)"
+        Print-RelayStatus $configFile
         return
     }
 
-    $configRaw = Get-Content $configFile -Raw
-    $existingId = Get-JsonValue $configRaw "channels.gochat.channelId"
-
-    if ($existingId) {
-        Write-Info "Existing channelId: $existingId -- skipping registration."
-        Ensure-DmPolicyOpen $configFile
-        Print-Credentials
-        return
+    $registered = Try-RegisterRelay -DeviceName $deviceName
+    if (-not $registered) {
+        Exit-WithError "Relay registration did not return usable credentials. The extension was installed, but relay setup is incomplete. Check network access to $RELAY_HTTP_URL or install again with -Code."
     }
 
-    Write-Info "Registering with relay platform..."
-    try {
-        $body = '{"name":"OpenClaw GoChat Plugin"}'
-        $response = Invoke-RestMethod -Uri "$RELAY_HTTP_URL/api/plugin/register" `
-            -Method POST `
-            -ContentType "application/json" `
-            -Body $body `
-            -TimeoutSec 15 `
-            -ErrorAction Stop
-    } catch {
-        Write-Warn "Registration failed (network error). Will auto-register on first gateway start."
-        return
-    }
-
-    $respJson = $response | ConvertTo-Json -Depth 10 -Compress
-    $regChannelId = Get-JsonValue $respJson "channelId"
-    $regSecret = Get-JsonValue $respJson "secret"
-
-    if (-not $regChannelId -or -not $regSecret) {
-        Write-Warn "Registration response missing channelId or secret."
-        return
-    }
-
-    Write-Ok "Registered! channelId=$regChannelId"
-
-    Write-Info "Writing config..."
-    try {
-        Write-ConfigWithNode -ConfigFile $configFile -ChannelId $regChannelId -Secret $regSecret
-        Write-Ok "Config saved."
-    } catch {
-        Write-Warn "Failed to write config."
-        return
-    }
-
-    Print-Credentials
+    Write-GoChatConfig -ConfigFile $configFile -Mode "relay" -Name $registered.Name -RelayUrl $registered.RelayUrl -ChannelId $registered.ChannelId -Secret $registered.Secret
+    Write-Ok "Relay registered. channelId=$($registered.ChannelId)"
+    Print-RelayStatus $configFile
 }
 
-function Ensure-DmPolicyOpen {
-    param([string]$ConfigFile)
-    & node -e @"
-        const fs = require('fs');
-        const c = JSON.parse(fs.readFileSync(process.argv[1],'utf8'));
-        const g = c.channels && c.channels.gochat;
-        if (g && g.dmPolicy !== 'open') {
-            g.dmPolicy = 'open';
-            fs.writeFileSync(process.argv[1], JSON.stringify(c, null, 2) + '\n');
+function Configure-Local {
+    $configFile = Join-Path (Get-OpenClawDir) "openclaw.json"
+    $snapshot = Get-GoChatConfigSnapshot $configFile
+    $deviceName = if ($snapshot.Name) { $snapshot.Name } else { Get-DefaultDeviceName }
+    $secret = if ($snapshot.Secret) { $snapshot.Secret } else { New-RandomSecret }
+    $port = if ($snapshot.DirectPort) { $snapshot.DirectPort } else { "$DEFAULT_LOCAL_PORT" }
+
+    Write-GoChatConfig -ConfigFile $configFile -Mode "local" -Name $deviceName -Secret $secret -DirectPort $port
+    Print-LocalStatus $configFile
+}
+
+function Install-Extension {
+    if ($FromTarball) {
+        if (-not (Test-Path $FromTarball)) {
+            Exit-WithError "Tarball not found: $FromTarball"
         }
-"@ $ConfigFile 2>$null
-}
-
-function Print-Credentials {
-    $ocDir = Get-OpenClawDir
-    $configFile = Join-Path $ocDir "openclaw.json"
-
-    if (-not (Test-Path $configFile)) { return }
-
-    $configRaw = Get-Content $configFile -Raw
-    $channelId = Get-JsonValue $configRaw "channels.gochat.channelId"
-    $secret = Get-JsonValue $configRaw "channels.gochat.webhookSecret"
-
-    if (-not $channelId -and -not $secret) { return }
-
-    Write-Host ""
-    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
-    Write-Host "`e[36;1m  GoChat Connection Credentials`e[0m"
-    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
-    Write-Host ""
-
-    if ($channelId) {
-        Write-Host "  Channel ID:    `e[32m$channelId`e[0m"
-    } else {
-        Write-Host "  Channel ID:    (pending - will be registered on first gateway start)"
+        Install-FromTarball $FromTarball
+        return
     }
 
-    if ($secret) {
-        Write-Host "  Secret Key:    `e[32m$secret`e[0m"
-    } else {
-        Write-Host "  Secret Key:    (pending - will be generated on first gateway start)"
+    $scriptDir = $PSScriptRoot
+    if ($scriptDir -and (Test-Path (Join-Path $scriptDir "package.json"))) {
+        Install-FromSource $scriptDir
+        return
     }
 
-    Write-Host "  DM Policy:     open (no pairing approval needed)"
-    Write-Host ""
-    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
-    Write-Host ""
+    Install-Remote
 }
-
-function Configure-GoChat {
-    param([string]$InstallMode, [string]$PairCode = "")
-
-    $extDir = Get-ExtensionsDir
-
-    Write-Host ""
-    Write-Info "──── GoChat Configuration ────"
-    Write-Info "  platform:      $($Script:Platform) ($($Script:Arch))"
-    Write-Info "  mode:          $InstallMode"
-    Write-Info "  extension dir: $extDir\$EXTENSION_NAME"
-
-    if ($InstallMode -eq "relay") {
-        Write-Info "  relay:         $RELAY_WS_URL"
-        Write-Info "  dmPolicy:      open (skip pairing)"
-        if ($PairCode) {
-            Write-Info "  connectCode:   $PairCode"
-        }
-        Write-Info "──────────────────────────"
-        Write-Host ""
-        Register-Relay $PairCode
-    } else {
-        Write-Info "  server:        built-in HTTP API on port 9750"
-        Write-Info "  dmPolicy:      open"
-        Write-Info "──────────────────────────"
-    }
-
-    Write-Host ""
-    Write-Ok "GoChat is ready!"
-    Write-Host ""
-    Write-Info "Usage:"
-    Write-Info "  openclaw gateway run                # Start gateway"
-    Write-Info "  openclaw channels list              # Check channel status"
-    Write-Info "  openclaw gochat show-credentials    # View credentials"
-    Write-Host ""
-}
-
-# ──────────────────────────────────────────────
-# Help
-# ──────────────────────────────────────────────
 
 function Show-Help {
     Write-Host ""
     Write-Host "Usage: .\install.ps1 [OPTIONS]"
     Write-Host ""
     Write-Host "Options:"
-    Write-Host "  -Relay             Relay mode (default, auto-register)"
+    Write-Host "  -Relay             Relay mode (default)"
     Write-Host "  -Local             Local mode"
     Write-Host "  -Code <code>       Claim a 6-digit relay connection code"
-    Write-Host "  -Mode <mode>       Set mode: local or relay"
-    Write-Host "  -FromTarball <path> Install from .tar.gz"
+    Write-Host "  -Mode <mode>       Set mode: relay or local"
+    Write-Host "  -FromTarball <p>   Install from a local .tar.gz"
     Write-Host "  -Help              Show this help"
-    Write-Host ""
-    Write-Host "Examples:"
-    Write-Host "  .\install.ps1"
-    Write-Host "  .\install.ps1 -Code 123456"
-    Write-Host "  .\install.ps1 -Local"
-    Write-Host "  .\install.ps1 -FromTarball .\gochat-extension.tar.gz"
     Write-Host ""
     Write-Host "Remote install (run in PowerShell):"
     Write-Host "  & ([scriptblock]::Create((irm '$REMOTE_INSTALL_PS_URL')))"
     Write-Host "  & ([scriptblock]::Create((irm '$REMOTE_INSTALL_PS_URL'))) -Code '123456'"
     Write-Host ""
 }
-
-# ──────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────
 
 function Main {
     Write-Host ""
@@ -837,79 +673,52 @@ function Main {
     Write-Host "─────────────────────────────────────`e[0m"
     Write-Host ""
 
-    if ($Help) { Show-Help; exit 0 }
+    if ($Help) {
+        Show-Help
+        exit 0
+    }
 
     Detect-Platform
+    Ensure-Prerequisites
+    Install-Extension
 
-    # Resolve mode
     $installMode = "relay"
     if ($Local) { $installMode = "local" }
     if ($Relay) { $installMode = "relay" }
-    if ($Mode -in @("local", "relay")) { $installMode = $Mode }
+    if ($Mode -in @("relay", "local")) { $installMode = $Mode }
     if ($Code) { $installMode = "relay" }
 
-    # Check Node.js
-    $node = Get-Command "node" -ErrorAction SilentlyContinue
-    if (-not $node) {
-        Write-Fail "Node.js is required but not found."
-        Write-Fail "Install: https://nodejs.org/  or  winget install OpenJS.NodeJS.LTS"
-        exit 1
-    }
-
-    $npm = Get-Command "npm" -ErrorAction SilentlyContinue
-    if (-not $npm) {
-        Write-Fail "npm is required but not found."
-        Write-Fail "Reinstall Node.js: https://nodejs.org/"
-        exit 1
-    }
-
-    $Script:NodeVersion = & node --version 2>$null
-    Write-Info "Node.js: $($Script:NodeVersion)"
-
-    $ocFound = Detect-OpenClaw
-    if ($ocFound) {
-        $ocVer = & $Script:OpenClawBin --version 2>$null | Select-Object -First 1
-        Write-Info "OpenClaw version: $ocVer"
-    } else {
-        Write-Warn "OpenClaw CLI not found. Extension will install but won't work until OpenClaw is installed."
-    }
-
-    # Install
-    if ($FromTarball) {
-        if (-not (Test-Path $FromTarball)) {
-            Write-Fail "Tarball not found: $FromTarball"
-            exit 1
-        }
-        Install-FromTarball $FromTarball
-    } else {
-        $scriptDir = $PSScriptRoot
-        if ($scriptDir -and (Test-Path (Join-Path $scriptDir "package.json"))) {
-            Install-FromSource $scriptDir
-        } else {
-            Install-Remote
-        }
-    }
-
-    Configure-GoChat $installMode $Code
-
-    # Environment Summary
     Write-Host ""
-    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
-    Write-Host "`e[36;1m  Environment Summary`e[0m"
-    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
-    Write-Host "  Plugin:        GoChat v$VERSION"
-    Write-Host "  Platform:      $($Script:Platform) ($($Script:Arch))"
-    Write-Host "  Node.js:       $($Script:NodeVersion)"
-    if ($Script:OpenClawBin) {
-        $ocVer = & $Script:OpenClawBin --version 2>$null | Select-Object -First 1
-        Write-Host "  OpenClaw:      $ocVer"
+    Write-Info "──── GoChat Configuration ────"
+    Write-Info "  platform:      $($Script:Platform) ($($Script:Arch))"
+    Write-Info "  mode:          $installMode"
+    Write-Info "  extension dir: $(Join-Path (Get-ExtensionsDir) $EXTENSION_NAME)"
+    if ($installMode -eq "relay") {
+        Write-Info "  relay:         $RELAY_WS_URL"
+        Write-Info "  dmPolicy:      open"
+        if ($Code) {
+            Write-Info "  connectCode:   $Code"
+        }
     } else {
-        Write-Host "  OpenClaw:      (not installed)"
+        Write-Info "  server:        built-in HTTP API on port $DEFAULT_LOCAL_PORT"
+        Write-Info "  dmPolicy:      open"
     }
-    Write-Host "`e[36;1m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`e[0m"
-    Write-Host ""
+    Write-Info "──────────────────────────"
 
-    Write-Host "`e[32;1mGoChat extension installed successfully!`e[0m"
+    if ($installMode -eq "local") {
+        Configure-Local
+    } else {
+        Configure-Relay $Code
+    }
+
+    Write-Host ""
+    Write-Ok "GoChat is ready!"
+    Write-Host ""
+    Write-Info "Next steps:"
+    Write-Info "  openclaw gateway run"
+    Write-Info "  openclaw channels list"
+    Write-Info "  openclaw gochat show-credentials"
+    Write-Host ""
 }
 
 Main
