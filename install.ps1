@@ -503,6 +503,69 @@ function Ensure-ConfigFile {
     }
 }
 
+function Get-HttpErrorBody {
+    param([Parameter(ValueFromPipeline = $true)]$ErrorRecord)
+
+    try {
+        $response = $ErrorRecord.Exception.Response
+        if (-not $response) {
+            return ""
+        }
+        $stream = $response.GetResponseStream()
+        if (-not $stream) {
+            return ""
+        }
+        $reader = New-Object System.IO.StreamReader($stream)
+        try {
+            return $reader.ReadToEnd()
+        } finally {
+            $reader.Dispose()
+            $stream.Dispose()
+        }
+    } catch {
+        return ""
+    }
+}
+
+function Resolve-ClaimErrorMessage {
+    param($ErrorRecord)
+
+    $statusCode = $null
+    try {
+        if ($ErrorRecord.Exception.Response) {
+            $statusCode = [int]$ErrorRecord.Exception.Response.StatusCode
+        }
+    } catch {
+    }
+
+    $responseBody = Get-HttpErrorBody $ErrorRecord
+    $combined = (($responseBody + " " + $ErrorRecord.Exception.Message).Trim()).ToLowerInvariant()
+
+    if ($combined -match "pair code expired") {
+        return "Connection code expired. Generate a fresh 6-digit code and try again."
+    }
+    if ($combined -match "pair code already used") {
+        return "Connection code was already used. Generate a fresh 6-digit code and try again."
+    }
+    if ($combined -match "pair code not found") {
+        return "Connection code was not found. Double-check the 6-digit code or generate a new one."
+    }
+    if ($statusCode -eq 409) {
+        return "Connection code was already used. Generate a fresh 6-digit code and try again."
+    }
+    if ($statusCode -eq 404) {
+        return "Connection code was not found. Double-check the 6-digit code or generate a new one."
+    }
+    if ($statusCode -eq 400) {
+        return "Connection code is invalid or expired. Generate a fresh 6-digit code and try again."
+    }
+    if ($statusCode) {
+        return "Failed to claim connection code (HTTP $statusCode). Check the code and network, then try again."
+    }
+
+    return "Failed to claim connection code. Check the code and network, then try again."
+}
+
 function Write-ConfigWithNode {
     param(
         [string]$ConfigFile,
@@ -557,7 +620,7 @@ function Claim-RelayPairCode {
             -TimeoutSec 20 `
             -ErrorAction Stop
     } catch {
-        Write-Fail "Failed to claim connection code. Check the code and network, then try again."
+        Write-Fail (Resolve-ClaimErrorMessage $_)
         exit 1
     }
 

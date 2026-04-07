@@ -516,19 +516,42 @@ ensure_config_file() {
 claim_relay_pair_code() {
   local config_file="$1"
   local pair_code="$2"
+  local response_file
+  local http_code
 
   ensure_config_file "${config_file}"
 
   info "Claiming connection code ${pair_code}..."
   local reg_response
-  reg_response="$(curl -sf -X POST "${RELAY_HTTP_URL}/api/plugin/pair/claim" \
+  response_file="$(mktemp "${TMPDIR:-/tmp}/gochat-claim-response.XXXXXX")"
+  http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" -X POST "${RELAY_HTTP_URL}/api/plugin/pair/claim" \
     -H "Content-Type: application/json" \
     -d "{\"code\":\"${pair_code}\",\"name\":\"OpenClaw GoChat Plugin\"}" \
     --connect-timeout 10 \
     --max-time 20 2>/dev/null || true)"
+  reg_response="$(cat "${response_file}" 2>/dev/null || true)"
+  rm -f "${response_file}"
 
-  if [ -z "${reg_response}" ]; then
+  if [ -z "${reg_response}" ] && [ -z "${http_code}" ]; then
     fail "Failed to claim connection code. Check the code and network, then try again."
+    exit 1
+  fi
+
+  if [ "${http_code:-0}" -lt 200 ] || [ "${http_code:-0}" -ge 300 ]; then
+    case "${reg_response}" in
+      *"pair code expired"*)
+        fail "Connection code expired. Generate a fresh 6-digit code and try again."
+        ;;
+      *"pair code already used"*)
+        fail "Connection code was already used. Generate a fresh 6-digit code and try again."
+        ;;
+      *"pair code not found"*)
+        fail "Connection code was not found. Double-check the 6-digit code or generate a new one."
+        ;;
+      *)
+        fail "Failed to claim connection code (HTTP ${http_code}). Check the code and network, then try again."
+        ;;
+    esac
     exit 1
   fi
 
