@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.7-plugin.13] - 2026-04-07
+
+### Changed
+- Shell installer now refuses npm fallback so script installs always come from current GitHub source
+- Enabled GoChat block streaming by default across plugin runtime and installers
+- Added relay reply event passthrough and chat UI incremental rendering support
+- Version bump to plugin.13
+
 ## [2026.4.6-plugin.12] - 2026-04-07
 
 ### Changed

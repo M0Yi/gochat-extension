@@ -6,9 +6,8 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.6-plugin.12"
+VERSION="2026.4.7-plugin.13"
 EXTENSION_NAME="gochat"
-PACKAGE_NAME="@m0yi/gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
 REPO_TARBALL_URL="https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
@@ -435,58 +434,19 @@ install_piped() {
     if download_repo_tarball "${tarball}"; then
       install_from_tarball "${tarball}"
       rm -rf "${tmp_dir}"
-    elif command -v npm &>/dev/null; then
-      warn "GitHub source tarball download failed. Falling back to npm package install..."
-      local pack_log
-      pack_log="${tmp_dir}/npm-pack.log"
-      (
-        cd "${tmp_dir}" &&
-        npm pack "${PACKAGE_NAME}" --silent
-      ) >"${pack_log}" 2>&1 || {
-        fail "npm package install failed. Check npm registry access."
-        rm -rf "${tmp_dir}"
-        exit 1
-      }
-      tarball="$(tail -n 1 "${pack_log}")"
-      if [ -z "${tarball}" ] || [ ! -f "${tmp_dir}/${tarball}" ]; then
-        fail "npm pack did not produce a tarball."
-        rm -rf "${tmp_dir}"
-        exit 1
-      fi
-      install_from_tarball "${tmp_dir}/${tarball}"
-      rm -rf "${tmp_dir}"
     else
-      fail "GitHub source tarball download failed, and npm is not available."
+      fail "GitHub source tarball download failed."
+      fail "Refusing to fall back to npm because that may install an older plugin version."
       rm -rf "${tmp_dir}"
       exit 1
     fi
-  elif command -v npm &>/dev/null; then
-    info "git not found. Falling back to npm package install..."
-    local pack_log
-    pack_log="${tmp_dir}/npm-pack.log"
-    (
-      cd "${tmp_dir}" &&
-      npm pack "${PACKAGE_NAME}" --silent
-    ) >"${pack_log}" 2>&1 || {
-      fail "npm package install failed. Check npm registry access."
-      rm -rf "${tmp_dir}"
-      exit 1
-    }
-    tarball="$(tail -n 1 "${pack_log}")"
-    if [ -z "${tarball}" ] || [ ! -f "${tmp_dir}/${tarball}" ]; then
-      fail "npm pack did not produce a tarball."
-      rm -rf "${tmp_dir}"
-      exit 1
-    fi
-    install_from_tarball "${tmp_dir}/${tarball}"
-    rm -rf "${tmp_dir}"
   else
-    fail "Pipe install requires git, curl/wget, or npm, but none are installed."
+    fail "Pipe install requires git or curl/wget, but none are installed."
     fail "Install one of them first:"
     case "${PLATFORM}" in
-      macos)           fail "  brew install git  OR  brew install curl  OR  brew install node" ;;
-      linux|linux-wsl) fail "  sudo apt install git  OR  sudo apt install curl  OR  sudo apt install npm" ;;
-      bsd)             fail "  pkg install git  OR  pkg install curl  OR  pkg install npm" ;;
+      macos)           fail "  brew install git  OR  brew install curl" ;;
+      linux|linux-wsl) fail "  sudo apt install git  OR  sudo apt install curl" ;;
+      bsd)             fail "  pkg install git  OR  pkg install curl" ;;
     esac
     rm -rf "${tmp_dir}"
     exit 1
