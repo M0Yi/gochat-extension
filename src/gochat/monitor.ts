@@ -17,6 +17,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 let _pluginVersion: string | null = null;
+const ACTIVE_STATUS_REFRESH_MS = 10_000;
 
 function getPluginVersion(): string {
   if (_pluginVersion) return _pluginVersion;
@@ -93,11 +94,19 @@ export async function monitorGoChatProvider(
   let transientStatus: "syncing" | "error" | null = null;
   let transientUntil = 0;
   let transientTimer: ReturnType<typeof setTimeout> | null = null;
+  let activeStatusTimer: ReturnType<typeof setInterval> | null = null;
 
   const clearTransientTimer = (): void => {
     if (transientTimer) {
       clearTimeout(transientTimer);
       transientTimer = null;
+    }
+  };
+
+  const stopActiveStatusPulse = (): void => {
+    if (activeStatusTimer) {
+      clearInterval(activeStatusTimer);
+      activeStatusTimer = null;
     }
   };
 
@@ -115,6 +124,19 @@ export async function monitorGoChatProvider(
   let lastReportedStatus = resolveStatus();
 
   let pushRelayStatusNow = (): void => {};
+
+  const ensureActiveStatusPulse = (): void => {
+    if (activeJobs <= 0 || activeStatusTimer) {
+      return;
+    }
+    activeStatusTimer = setInterval(() => {
+      if (activeJobs <= 0) {
+        stopActiveStatusPulse();
+        return;
+      }
+      pushRelayStatusNow();
+    }, ACTIVE_STATUS_REFRESH_MS);
+  };
 
   const scheduleStatusReset = (): void => {
     clearTransientTimer();
@@ -150,11 +172,15 @@ export async function monitorGoChatProvider(
 
   const beginJob = (): void => {
     activeJobs += 1;
+    ensureActiveStatusPulse();
     publishStatus();
   };
 
   const finishJob = (): void => {
     activeJobs = Math.max(0, activeJobs - 1);
+    if (activeJobs === 0) {
+      stopActiveStatusPulse();
+    }
     publishStatus();
   };
 
@@ -238,6 +264,7 @@ export async function monitorGoChatProvider(
   return {
     stop: () => {
       clearTransientTimer();
+      stopActiveStatusPulse();
       setRelayStatusReporter(null);
       setRelayWsSender(null);
       stopRelay();

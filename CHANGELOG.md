@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.7-plugin.14] - 2026-04-07
+
+### Fixed
+- Fixed relay WebSocket message handling so long-running AI execution and block streaming no longer block heartbeat/status traffic
+- Added active-job relay status keepalive pulses during long-running executions
+- Fixed S3 presigned upload signing for browser uploads, including UTF-8 filenames and required `x-amz-content-sha256` propagation
+- Added stricter S3 upload test flow: upload, public access verification, then cleanup
+
 ## [2026.4.7-plugin.13] - 2026-04-07
 
 ### Changed

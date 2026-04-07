@@ -144,7 +144,7 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
         resolve();
       });
 
-      socket.on("message", async (raw: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
+      socket.on("message", (raw: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
         try {
           const text = typeof raw === "string"
             ? raw
@@ -157,11 +157,13 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
 
           if (parsed.type === "message") {
             log("info", `recv message: conv=${parsed.conversationId || "default"} text="${(parsed.text || "").substring(0, 60)}..."`);
-            try {
-              await onMessage(parsed);
-            } catch (err) {
-              onError?.(err instanceof Error ? err : new Error(String(err)));
-            }
+            // Detach message handling from the WS read loop so long-running
+            // model execution or block streaming does not starve ping/status traffic.
+            void Promise.resolve()
+              .then(() => onMessage(parsed))
+              .catch((err) => {
+                onError?.(err instanceof Error ? err : new Error(String(err)));
+              });
           } else if (parsed.type === "reply") {
             log("info", `recv reply: conv=${parsed.conversationId || "default"} text="${(parsed.text || "").substring(0, 60)}..."`);
           } else if (parsed.type === "pong") {
