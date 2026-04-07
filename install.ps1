@@ -297,19 +297,30 @@ function Install-FromTarball {
         Move-Item $tmpExtract $target -Force
     }
 
-    $pkgJson = Join-Path $target "package.json"
-    if (Test-Path $pkgJson) {
-        Write-Info "Installing npm dependencies..."
-        Push-Location $target
-        try {
-            & npm install --production 2>&1 | ForEach-Object { Write-Verbose $_ }
-        } catch {
-            Write-Warn "npm install had warnings (non-fatal)"
-        }
-        Pop-Location
-    }
+    Install-NpmDependencies $target
 
     Write-Ok "Installed to $target"
+}
+
+function Install-NpmDependencies {
+    param([string]$TargetDir)
+
+    $pkgJson = Join-Path $TargetDir "package.json"
+    if (-not (Test-Path $pkgJson)) {
+        return
+    }
+
+    Write-Info "Installing npm dependencies..."
+    $npmInstall = Start-Process -FilePath "npm" `
+        -ArgumentList @("install", "--production") `
+        -WorkingDirectory $TargetDir `
+        -NoNewWindow `
+        -Wait `
+        -PassThru
+    if ($npmInstall.ExitCode -ne 0) {
+        Write-Fail "npm install failed."
+        exit 1
+    }
 }
 
 function Install-FromSource {
@@ -332,17 +343,7 @@ function Install-FromSource {
     $gitDir = Join-Path $target ".git"
     if (Test-Path $gitDir) { Remove-Item $gitDir -Recurse -Force -ErrorAction SilentlyContinue }
 
-    $pkgJson = Join-Path $target "package.json"
-    if (Test-Path $pkgJson) {
-        Write-Info "Installing npm dependencies..."
-        Push-Location $target
-        try {
-            & npm install --production 2>&1 | ForEach-Object { Write-Verbose $_ }
-        } catch {
-            Write-Warn "npm install had warnings (non-fatal)"
-        }
-        Pop-Location
-    }
+    Install-NpmDependencies $target
 
     Write-Ok "Installed to $target"
 }
