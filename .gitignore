@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tgz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# State directory (local development)
+.openclaw/
+state/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Secrets (development)
+*.secrets.json
+secrets.baseline
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Webpack/Build artifacts
+*.bundle.js
+*.bundle.css
+
+# TypeScript incremental
+*.tsbuildinfo
+
+# Lock files (optional - uncomment if you want to exclude package-lock.json)
+# package-lock.json
+# pnpm-lock.yaml
+
+# Install script backup
+install.sh.bak
