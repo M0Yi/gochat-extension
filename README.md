@@ -271,6 +271,9 @@ openclaw channels list
 
 # If an older local OpenClaw build needs manual gateway repair help
 openclaw gochat ensure-gateway-access
+
+# If a live GoChat session replies with a gateway pairing-required message
+openclaw devices approve --latest
 ```
 
 ### Sending Messages

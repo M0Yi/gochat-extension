@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.8-plugin.24] - 2026-04-08
+
+### Added
+- When an inbound GoChat session fails with gateway `pairing required`, the plugin now sends an actionable chat reply that includes a concrete `openclaw devices approve ...` command and a fallback `openclaw pairing approve --channel gochat <PAIRING_CODE> --notify` hint instead of letting the model narrate a vague recovery attempt
+
 ## [2026.4.8-plugin.23] - 2026-04-08
 
 ### Changed
