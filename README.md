@@ -269,6 +269,9 @@ openclaw plugins list
 # Check channel status
 openclaw channels list
 
+# GoChat now proactively pushes "Subagent permission: ready/action required"
+# status messages into the chat when the local gateway pairing state changes
+
 # If an older local OpenClaw build needs manual gateway repair help
 openclaw gochat ensure-gateway-access
 

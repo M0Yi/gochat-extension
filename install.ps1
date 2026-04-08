@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.8-plugin.24"
+$VERSION = "2026.4.8-plugin.25"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -76,7 +76,7 @@ function Warn-IfKnownPairingBugHost {
     }
     if ([int64]$key -lt 20260408) {
         Write-Warn "OpenClaw $triplet is older than 2026.4.8 and is known to surface local subagent pairing-required failures."
-        Write-Warn "GoChat $VERSION adds runtime auto-repair polling as a mitigation, but upgrading OpenClaw is still recommended."
+        Write-Warn "GoChat $VERSION now surfaces subagent permission status and approval commands in chat, but upgrading OpenClaw is still recommended."
     }
 }
 

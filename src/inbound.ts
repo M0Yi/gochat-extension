@@ -23,6 +23,11 @@ import type { ResolvedGoChatAccount } from "./accounts.js";
 import { resolveGoChatAllowlistMatch, resolveGoChatConversationMatch } from "./policy.js";
 import { getGoChatRuntime } from "./runtime.js";
 import { sendMessageGoChat } from "./send.js";
+import {
+  buildSubagentPermissionStatusMessage,
+  inspectSubagentPermissionStatus,
+  type SubagentPermissionStatus,
+} from "./subagent-permission-status.js";
 import type { CoreConfig, GoChatAttachment, GoChatInboundMessage, GroupPolicy } from "./types.js";
 
 const CHANNEL_ID = "gochat" as const;
@@ -51,14 +56,7 @@ type LocalAudioTranscriptionResult = {
   text: string;
 };
 
-type PendingDeviceApproval = {
-  requestId?: string;
-  createdAtMs?: number;
-};
-
-type DeviceListJson = {
-  pending?: PendingDeviceApproval[];
-};
+const conversationPermissionAnnouncements = new Map<string, string>();
 
 function normalizeHost(value: string | undefined): string | null {
   const host = String(value ?? "").trim().toLowerCase();
@@ -109,69 +107,38 @@ function clipTranscript(text: string, maxChars: number): string {
   return `${text.slice(0, Math.max(0, maxChars)).trim()}\n...[transcript truncated]`;
 }
 
-function extractJsonPayload(raw: string): unknown {
-  const text = raw.trim();
-  if (!text) {
-    throw new Error("empty command output");
-  }
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    if (char !== "{" && char !== "[") {
-      continue;
-    }
-    const candidate = text.slice(index).trim();
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // keep scanning
-    }
-  }
-
-  throw new Error("json payload not found in command output");
-}
-
 function isGatewayPairingRequiredError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
   return /pairing required/i.test(message) || /GatewayClientRequestError/i.test(message);
 }
 
-async function resolveDeviceApprovalCommand(): Promise<string> {
-  const openclawBin = process.env.GOCHAT_OPENCLAW_BIN?.trim() || "openclaw";
-  try {
-    const { stdout, stderr } = await execFileAsync(openclawBin, ["devices", "list", "--json", "--timeout", "5000"], {
-      timeout: 10_000,
-      maxBuffer: 2 * 1024 * 1024,
-    });
-    const parsed = extractJsonPayload([stdout, stderr].filter(Boolean).join("\n")) as DeviceListJson;
-    const pending = [...(parsed.pending ?? [])].sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0));
-    const latest = pending.find((entry) => entry.requestId?.trim());
-    if (latest?.requestId?.trim()) {
-      return `openclaw devices approve ${latest.requestId.trim()}`;
-    }
-  } catch {
-    // fall back to --latest
+async function maybePushSubagentPermissionStatus(params: {
+  conversationId: string;
+  accountId: string;
+  statusSink?: (patch: { lastOutboundAt?: number }) => void;
+  runtime: RuntimeEnv;
+}): Promise<SubagentPermissionStatus> {
+  const status = await inspectSubagentPermissionStatus();
+  const conversationKey = `${params.accountId}:${params.conversationId}`;
+  const previousSignature = conversationPermissionAnnouncements.get(conversationKey);
+  if (previousSignature === status.detailSignature) {
+    return status;
   }
-  return "openclaw devices approve --latest";
-}
 
-async function buildGatewayPairingRequiredReply(): Promise<string> {
-  const approveCommand = await resolveDeviceApprovalCommand();
-  return [
-    "这次会话被 OpenClaw Gateway 的授权拦下了，先执行下面的命令：",
-    "",
-    "```bash",
-    approveCommand,
-    "```",
-    "",
-    "如果你要批准的是 GoChat 私聊 pairing code，则执行：",
-    "",
-    "```bash",
-    "openclaw pairing approve --channel gochat <PAIRING_CODE> --notify",
-    "```",
-    "",
-    "执行完成后，再重新发送刚才那条消息。",
-  ].join("\n");
+  conversationPermissionAnnouncements.set(conversationKey, status.detailSignature);
+  if (status.state === "unknown") {
+    return status;
+  }
+
+  try {
+    await sendMessageGoChat(params.conversationId, buildSubagentPermissionStatusMessage(status), {
+      accountId: params.accountId,
+    });
+    params.statusSink?.({ lastOutboundAt: Date.now() });
+  } catch {
+    params.runtime.error?.("gochat: failed to push subagent permission status");
+  }
+  return status;
 }
 
 function buildAudioTranscriptContext(transcripts: LocalAudioTranscriptionResult[]): string {
@@ -658,6 +625,13 @@ export async function handleGoChatInbound(params: {
   const audioTranscriptContext = buildAudioTranscriptContext(audioTranscripts);
   const bodyText = [rawBody, mediaPlaceholder, audioTranscriptContext].filter(Boolean).join("\n\n").trim();
 
+  const currentPermissionStatus = await maybePushSubagentPermissionStatus({
+    conversationId,
+    accountId: account.accountId,
+    statusSink,
+    runtime,
+  });
+
   const body = core.channel.reply.formatAgentEnvelope({
     channel: "GoChat",
     from: fromLabel,
@@ -739,7 +713,19 @@ export async function handleGoChatInbound(params: {
     runtime.error?.(`gochat: gateway pairing required: ${error instanceof Error ? error.message : String(error)}`);
 
     try {
-      await sendMessageGoChat(conversationId, await buildGatewayPairingRequiredReply(), {
+      const latestPermissionStatus = currentPermissionStatus.state === "pending_approval"
+        ? currentPermissionStatus
+        : await inspectSubagentPermissionStatus({ forceRefresh: true });
+
+      if (
+        currentPermissionStatus.state === "pending_approval" &&
+        latestPermissionStatus.state === "pending_approval" &&
+        currentPermissionStatus.detailSignature === latestPermissionStatus.detailSignature
+      ) {
+        return;
+      }
+
+      await sendMessageGoChat(conversationId, buildSubagentPermissionStatusMessage(latestPermissionStatus), {
         accountId: account.accountId,
       });
       statusSink?.({ lastOutboundAt: Date.now() });

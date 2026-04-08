@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.24"
+VERSION="2026.4.8-plugin.25"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -69,7 +69,7 @@ warn_if_known_pairing_bug_host() {
   [ -z "${parsed_key}" ] && return 0
   if [ "${parsed_key}" -lt 20260408 ]; then
     warn "OpenClaw ${parsed} is older than 2026.4.8 and is known to surface local subagent pairing-required failures."
-    warn "GoChat ${VERSION} adds runtime auto-repair polling as a mitigation, but upgrading OpenClaw is still recommended."
+    warn "GoChat ${VERSION} now surfaces subagent permission status and approval commands in chat, but upgrading OpenClaw is still recommended."
   fi
 }
 

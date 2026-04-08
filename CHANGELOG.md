@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.8-plugin.25] - 2026-04-08
+
+### Added
+- GoChat now proactively pushes the current subagent permission state into each conversation on first contact and whenever the local gateway pairing state changes, so users can see `ready` / `action required` status without asking first
+- Pending local gateway repair requests now surface as an actionable status message with `openclaw devices approve ...`, while recovered sessions push a `ready` status message after admin scope returns
+
 ## [2026.4.8-plugin.24] - 2026-04-08
 
 ### Added
