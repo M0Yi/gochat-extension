@@ -128,6 +128,12 @@ func TestBuildChatSessionResponseNormalizesPluginStatuses(t *testing.T) {
 			Status:     "working",
 			AgentCount: 2,
 			Version:    "v1.2.3",
+			Metadata: map[string]string{
+				"currentModel": "zai/glm-5",
+				"modelSource":  "config",
+				"command":      "gateway",
+				"commandArgs":  "run --foreground",
+			},
 		},
 		connectedAt: time.Now(),
 		lastSeen:    time.Now(),
@@ -147,6 +153,15 @@ func TestBuildChatSessionResponseNormalizesPluginStatuses(t *testing.T) {
 	}
 	if !resp.Online {
 		t.Fatalf("expected online session")
+	}
+	if resp.CurrentModel != "zai/glm-5" {
+		t.Fatalf("expected currentModel zai/glm-5, got %q", resp.CurrentModel)
+	}
+	if resp.CommandArgs != "run --foreground" {
+		t.Fatalf("expected commandArgs run --foreground, got %q", resp.CommandArgs)
+	}
+	if resp.Metadata["command"] != "gateway" {
+		t.Fatalf("expected metadata command gateway, got %q", resp.Metadata["command"])
 	}
 }
 

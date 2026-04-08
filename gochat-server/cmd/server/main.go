@@ -122,6 +122,16 @@ func main() {
 		}
 	})
 	pluginWS.SetStatusHandler(func(channelID string, runtime types.PluginRuntimeStatus, online bool) {
+		currentModel := ""
+		modelSource := ""
+		command := ""
+		commandArgs := ""
+		if runtime.Metadata != nil {
+			currentModel = runtime.Metadata["currentModel"]
+			modelSource = runtime.Metadata["modelSource"]
+			command = runtime.Metadata["command"]
+			commandArgs = runtime.Metadata["commandArgs"]
+		}
 		statusMsg, _ := json.Marshal(map[string]interface{}{
 			"type":         "status",
 			"channelId":    channelID,
@@ -130,6 +140,11 @@ func main() {
 			"agentCount":   runtime.AgentCount,
 			"workStatus":   runtime.Status,
 			"officeStatus": handler.NormalizeOfficeStatusForExternal(runtime.Status),
+			"currentModel": currentModel,
+			"modelSource":  modelSource,
+			"command":      command,
+			"commandArgs":  commandArgs,
+			"metadata":     runtime.Metadata,
 			"uptime":       runtime.Uptime,
 			"timestamp":    time.Now().UnixMilli(),
 		})

@@ -469,6 +469,7 @@ func (p *PluginWS) HandlePluginWS() gin.HandlerFunc {
 						AgentCount: statusPayload.AgentCount,
 						Status:     normalizedStatus,
 						Uptime:     statusPayload.Uptime,
+						Metadata:   statusPayload.Metadata,
 					}
 					log.Printf("[plugin-ws] status update from channel %s: clientType=%s version=%s agents=%d status=%s uptime=%ds",
 						channelID, clientType, statusPayload.Version, statusPayload.AgentCount, normalizedStatus, statusPayload.Uptime)
@@ -811,6 +812,13 @@ func buildChatSessionResponse(pluginWS *PluginWS, ch *types.Channel, claims *Cha
 		resp.AgentCount = rt.AgentCount
 		resp.WorkStatus = normalizePluginWorkStatus(rt.Status)
 		resp.OfficeStatus = normalizeOfficeStatus(rt.Status)
+		resp.Metadata = rt.Metadata
+		if rt.Metadata != nil {
+			resp.CurrentModel = rt.Metadata["currentModel"]
+			resp.ModelSource = rt.Metadata["modelSource"]
+			resp.Command = rt.Metadata["command"]
+			resp.CommandArgs = rt.Metadata["commandArgs"]
+		}
 	}
 	if connectedAt, lastSeen, ok := pluginWS.GetChannelConnInfo(ch.ID); ok {
 		resp.ConnectedAt = connectedAt

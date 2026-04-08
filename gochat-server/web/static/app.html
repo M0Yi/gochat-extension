@@ -285,14 +285,34 @@ body{
 }
 .header-center{
   display:flex;
-  align-items:center;
-  gap:12px;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
 }
 .plugin-status{
   display:flex;
   align-items:center;
   gap:8px;
   font-size:12px;
+}
+.plugin-runtime{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.runtime-chip{
+  max-width:240px;
+  padding:3px 9px;
+  border-radius:999px;
+  border:1px solid rgba(137,180,250,.18);
+  background:rgba(137,180,250,.08);
+  color:var(--text-muted);
+  font-size:11px;
+  line-height:1.2;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .status-badge{
   padding:2px 8px;
@@ -867,6 +887,13 @@ body{
   .channel-name{
     font-size:15px;
   }
+  .plugin-runtime{
+    width:100%;
+    justify-content:flex-start;
+  }
+  .runtime-chip{
+    max-width:calc(100vw - 64px);
+  }
   .messages-wrap{
     padding:12px;
   }
@@ -951,6 +978,10 @@ body{
       <div class="plugin-status" id="pluginStatus">
         <span class="status-badge" id="workStatusBadge">-</span>
         <span class="agent-count" id="agentCountDisplay">-</span>
+      </div>
+      <div class="plugin-runtime" id="pluginRuntime">
+        <span class="runtime-chip" id="currentModelDisplay" title="">模型: -</span>
+        <span class="runtime-chip" id="commandArgsDisplay" title="">参数: -</span>
       </div>
     </div>
     <div class="header-right">
@@ -1141,6 +1172,8 @@ body{
   var sttLiveText = document.getElementById('sttLiveText');
   var recordBtn = document.getElementById('recordBtn');
   var reconnectBanner = document.getElementById('reconnectBanner');
+  var currentModelDisplay = document.getElementById('currentModelDisplay');
+  var commandArgsDisplay = document.getElementById('commandArgsDisplay');
 
   // Initialize
   messageInput.addEventListener('input', updateSendButton);
@@ -1291,6 +1324,10 @@ body{
     document.getElementById('miniOfficeStatus').className = 'mini-office-status';
     starAnimator.setState('idle');
     document.getElementById('miniOfficeDetail').textContent = '-';
+    currentModelDisplay.textContent = '模型: -';
+    currentModelDisplay.title = '';
+    commandArgsDisplay.textContent = '参数: -';
+    commandArgsDisplay.title = '';
 
     if (message) {
       showLoginError(message);
@@ -1384,6 +1421,45 @@ body{
     return normalizeOfficeStatus(rawStatus, officeStatus) === 'idle' ? 'idle' : 'working';
   }
 
+  function readRuntimeMetadata(session) {
+    return session && session.metadata && typeof session.metadata === 'object' ? session.metadata : {};
+  }
+
+  function ellipsizeValue(value, maxLen) {
+    var text = String(value || '').trim();
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return text.slice(0, Math.max(0, maxLen - 1)) + '…';
+  }
+
+  function renderRuntimeMeta(session) {
+    var metadata = readRuntimeMetadata(session);
+    var currentModel = String(
+      (session && session.currentModel) ||
+      metadata.currentModel ||
+      '-'
+    ).trim() || '-';
+    var command = String(
+      (session && session.command) ||
+      metadata.command ||
+      ''
+    ).trim();
+    var commandArgs = String(
+      (session && session.commandArgs) ||
+      metadata.commandArgs ||
+      ''
+    ).trim();
+    var commandLabel = [command, commandArgs].filter(Boolean).join(' ');
+    if (!commandLabel) {
+      commandLabel = '-';
+    }
+
+    currentModelDisplay.textContent = '模型: ' + ellipsizeValue(currentModel, 42);
+    currentModelDisplay.title = currentModel === '-' ? '' : currentModel;
+    commandArgsDisplay.textContent = '参数: ' + ellipsizeValue(commandLabel, 56);
+    commandArgsDisplay.title = commandLabel === '-' ? '' : commandLabel;
+  }
+
   function renderChannelStatus(session) {
     var badge = document.getElementById('workStatusBadge');
     var agentSpan = document.getElementById('agentCountDisplay');
@@ -1401,6 +1477,7 @@ body{
       miniStatus.className = 'mini-office-status offline';
       starAnimator.setState('idle');
       miniDetail.textContent = '-';
+      renderRuntimeMeta(null);
       return;
     }
 
@@ -1416,7 +1493,20 @@ body{
     miniStatus.textContent = label;
     miniStatus.className = 'mini-office-status ' + badgeClass;
     starAnimator.setState(getAnimatorState(rawStatus, officeStatus, online));
-    miniDetail.textContent = session.version || (agentCount === null ? currentDetailText : ('v' + agentCount));
+    renderRuntimeMeta(session);
+
+    var metadata = readRuntimeMetadata(session);
+    var detailParts = [];
+    if (session.version) {
+      detailParts.push('插件 ' + session.version);
+    }
+    if ((session.currentModel || metadata.currentModel)) {
+      detailParts.push('模型 ' + (session.currentModel || metadata.currentModel));
+    }
+    if ((session.commandArgs || metadata.commandArgs || session.command || metadata.command)) {
+      detailParts.push('命令 ' + [session.command || metadata.command || '', session.commandArgs || metadata.commandArgs || ''].filter(Boolean).join(' '));
+    }
+    miniDetail.textContent = detailParts.length ? detailParts.join(' · ') : (agentCount === null ? currentDetailText : ('v' + agentCount));
   }
 
   function validateStoredSession() {

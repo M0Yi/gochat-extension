@@ -245,19 +245,24 @@ type ChatLoginResponse struct {
 }
 
 type ChatSessionResponse struct {
-	Valid        bool      `json:"valid"`
-	ChannelID    string    `json:"channelId"`
-	ChannelName  string    `json:"channelName"`
-	UserID       string    `json:"userId,omitempty"`
-	Enabled      bool      `json:"enabled"`
-	Online       bool      `json:"online"`
-	Version      string    `json:"version,omitempty"`
-	AgentCount   int       `json:"agentCount,omitempty"`
-	WorkStatus   string    `json:"workStatus,omitempty"`
-	OfficeStatus string    `json:"officeStatus,omitempty"`
-	ConnectedAt  time.Time `json:"connectedAt,omitempty"`
-	LastSeen     time.Time `json:"lastSeen,omitempty"`
-	ExpiresAt    int64     `json:"expiresAt,omitempty"`
+	Valid        bool              `json:"valid"`
+	ChannelID    string            `json:"channelId"`
+	ChannelName  string            `json:"channelName"`
+	UserID       string            `json:"userId,omitempty"`
+	Enabled      bool              `json:"enabled"`
+	Online       bool              `json:"online"`
+	Version      string            `json:"version,omitempty"`
+	AgentCount   int               `json:"agentCount,omitempty"`
+	WorkStatus   string            `json:"workStatus,omitempty"`
+	OfficeStatus string            `json:"officeStatus,omitempty"`
+	CurrentModel string            `json:"currentModel,omitempty"`
+	ModelSource  string            `json:"modelSource,omitempty"`
+	Command      string            `json:"command,omitempty"`
+	CommandArgs  string            `json:"commandArgs,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	ConnectedAt  time.Time         `json:"connectedAt,omitempty"`
+	LastSeen     time.Time         `json:"lastSeen,omitempty"`
+	ExpiresAt    int64             `json:"expiresAt,omitempty"`
 }
 
 type ChatMessage struct {
@@ -278,10 +283,11 @@ type ClientInfo struct {
 
 // PluginRuntimeStatus holds plugin-specific runtime data (agent count, work status, etc.).
 type PluginRuntimeStatus struct {
-	Version    string `json:"version"`
-	AgentCount int    `json:"agentCount"`
-	Status     string `json:"status"`
-	Uptime     int64  `json:"uptime"`
+	Version    string            `json:"version"`
+	AgentCount int               `json:"agentCount"`
+	Status     string            `json:"status"`
+	Uptime     int64             `json:"uptime"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
 type AdminClient struct {

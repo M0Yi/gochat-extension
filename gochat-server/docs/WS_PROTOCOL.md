@@ -402,6 +402,10 @@ interface PluginStatus {
   agentCount: number;          // Agent 数量
   status: "idle" | "working"; // 工作状态
   uptime: number;              // 运行时长（秒）
+  currentModel?: string;       // 当前生效模型
+  command?: string;            // 当前主命令
+  commandArgs?: string;        // 当前命令参数
+  metadata?: Record<string, string>; // 额外运行时元数据
 }
 ```
 
