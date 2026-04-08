@@ -31,6 +31,11 @@ export type GoChatLocalAudioTranscriptionConfig = {
   maxTranscriptChars?: number;
 };
 
+export type GoChatGatewayAccessConfig = {
+  autoApproveLocalRepair?: boolean;
+  normalizeLoopbackRemoteUrl?: boolean;
+};
+
 export const DEFAULT_LOCAL_PORT = 9750;
 export const DEFAULT_LOCAL_HOST = "0.0.0.0";
 export const DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin";
@@ -58,6 +63,7 @@ export type GoChatAccountConfig = {
   allowPrivateNetwork?: boolean;
   trustedAttachmentHosts?: string[];
   localAudioTranscription?: GoChatLocalAudioTranscriptionConfig;
+  gatewayAccess?: GoChatGatewayAccessConfig;
   directPort?: number;
   directHost?: string;
   relayPlatformUrl?: string;

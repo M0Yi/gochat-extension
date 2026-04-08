@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.18"
+VERSION="2026.4.8-plugin.19"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -518,6 +518,8 @@ configure_gochat() {
     ensure_gochat_install_defaults "${config_file}" "local"
   fi
 
+  attempt_gateway_access_bootstrap
+
   echo ""
   ok "GoChat is ready!"
   echo ""
@@ -570,7 +572,11 @@ ensure_gochat_install_defaults() {
       enabled: true,
       mode: '${mode}',
       dmPolicy: 'open',
-      blockStreaming: true
+      blockStreaming: true,
+      gatewayAccess: Object.assign({
+        autoApproveLocalRepair: true,
+        normalizeLoopbackRemoteUrl: true
+      }, (c.channels.gochat && c.channels.gochat.gatewayAccess) || {})
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || true
@@ -651,7 +657,11 @@ claim_relay_pair_code() {
       webhookSecret: '${reg_secret}',
       relayPlatformUrl: '${reg_relay_url}',
       dmPolicy: 'open',
-      blockStreaming: true
+      blockStreaming: true,
+      gatewayAccess: Object.assign({
+        autoApproveLocalRepair: true,
+        normalizeLoopbackRemoteUrl: true
+      }, (c.channels.gochat && c.channels.gochat.gatewayAccess) || {})
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || {
@@ -759,7 +769,11 @@ register_relay() {
       webhookSecret: '${reg_secret}',
       relayPlatformUrl: '${RELAY_WS_URL}',
       dmPolicy: 'open',
-      blockStreaming: true
+      blockStreaming: true,
+      gatewayAccess: Object.assign({
+        autoApproveLocalRepair: true,
+        normalizeLoopbackRemoteUrl: true
+      }, (c.channels.gochat && c.channels.gochat.gatewayAccess) || {})
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || {
@@ -777,12 +791,27 @@ ensure_dm_policy_open() {
     const fs = require('fs');
     const c = JSON.parse(fs.readFileSync('${config_file}','utf8'));
     const g = c.channels && c.channels.gochat;
-    if (g && (g.dmPolicy !== 'open' || g.blockStreaming !== true)) {
+    if (g) {
       g.dmPolicy = 'open';
       g.blockStreaming = true;
+      g.gatewayAccess = Object.assign({
+        autoApproveLocalRepair: true,
+        normalizeLoopbackRemoteUrl: true
+      }, g.gatewayAccess || {});
       fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
     }
   " 2>/dev/null || true
+}
+
+attempt_gateway_access_bootstrap() {
+  if [ -z "${OPENCLAW_BIN}" ]; then
+    return 0
+  fi
+
+  info "Bootstrapping local gateway access..."
+  if ! "${OPENCLAW_BIN}" gochat ensure-gateway-access; then
+    warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
+  fi
 }
 
 print_credentials() {

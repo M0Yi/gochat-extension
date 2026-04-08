@@ -176,6 +176,7 @@ channels:
 
 The installer also copies bundled GoChat skills into `~/.openclaw/skills`, including the local audio workflow skill `gochat-local-audio-notes`.
 That skill bundles a local transcription script with multiple backend choices such as `whisper`, `faster-whisper`, `mlx-whisper`, and `whisper.cpp` when available.
+When OpenClaw is already running locally, the installer also tries to normalize local loopback gateway URLs and auto-approve the current CLI's safe local repair request so GoChat-triggered local operator actions keep full scopes without a manual `openclaw devices approve`.
 
 ### Configuration File
 
@@ -255,6 +256,9 @@ openclaw plugins list
 
 # Check channel status
 openclaw channels list
+
+# Re-run the local gateway access bootstrap if needed
+openclaw gochat ensure-gateway-access
 ```
 
 ### Sending Messages

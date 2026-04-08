@@ -43,6 +43,20 @@
             "items": { "type": "string" },
             "description": "Extra trusted hosts for inbound attachment downloads. The relay host is trusted automatically."
           },
+          "gatewayAccess": {
+            "type": "object",
+            "description": "Local gateway bootstrap policy for CLI/operator repair approval and loopback URL normalization.",
+            "properties": {
+              "autoApproveLocalRepair": {
+                "type": "boolean",
+                "description": "Auto-approve safe local CLI operator repair requests that only ask for the standard full operator scopes."
+              },
+              "normalizeLoopbackRemoteUrl": {
+                "type": "boolean",
+                "description": "Rewrite loopback aliases such as openclaw.local to ws://127.0.0.1 so local gateway heuristics stay on the loopback path."
+              }
+            }
+          },
           "localAudioTranscription": {
             "type": "object",
             "description": "Optional local audio transcription settings for inbound audio attachments.",

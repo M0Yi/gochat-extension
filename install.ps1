@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.8-plugin.18"
+$VERSION = "2026.4.8-plugin.19"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -413,6 +413,10 @@ next.enabled = true;
 next.name = name || current.name || 'OpenClaw GoChat Plugin';
 next.dmPolicy = 'open';
 next.blockStreaming = true;
+next.gatewayAccess = Object.assign({
+  autoApproveLocalRepair: true,
+  normalizeLoopbackRemoteUrl: true
+}, current.gatewayAccess || {});
 if (mode === 'local') {
   next.mode = 'local';
   next.directPort = Number(directPort || 9750);
@@ -598,6 +602,22 @@ function Print-RelayStatus {
     Write-Host ""
 }
 
+function Invoke-GatewayAccessBootstrap {
+    if (-not $Script:OpenClawBin) {
+        return
+    }
+
+    Write-Info "Bootstrapping local gateway access..."
+    try {
+        & $Script:OpenClawBin gochat ensure-gateway-access
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
+        }
+    } catch {
+        Write-Warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
+    }
+}
+
 function Print-LocalStatus {
     param([string]$ConfigFile)
 
@@ -743,6 +763,8 @@ function Main {
     } else {
         Configure-Relay $Code
     }
+
+    Invoke-GatewayAccessBootstrap
 
     Write-Host ""
     Write-Ok "GoChat is ready!"

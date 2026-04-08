@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.8-plugin.19] - 2026-04-08
+
+### Added
+- Added `openclaw gochat ensure-gateway-access` to normalize loopback gateway URLs and auto-approve safe local CLI repair requests that only ask for the standard full operator scopes
+
+### Changed
+- Installers now persist GoChat gateway access bootstrap defaults and run the local gateway access bootstrap step right after configuration
+- Plugin startup now retries the same safe local gateway access bootstrap in the background so existing installs can recover once the gateway is live
+
 ## [2026.4.8-plugin.18] - 2026-04-08
 
 ### Fixed
