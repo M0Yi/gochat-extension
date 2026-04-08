@@ -153,6 +153,7 @@ function resolveRuntimeModel(cfg: CoreConfig): { currentModel: string; modelSour
     modelSource: "unknown",
   };
 }
+
 export async function monitorGoChatProvider(
   opts: {
     accountId?: string;
@@ -183,6 +184,14 @@ export async function monitorGoChatProvider(
     accountId: account.accountId,
   });
   const runtimeCommand = resolveRuntimeCommandSnapshot();
+
+  const resolveLiveConfig = (): CoreConfig => {
+    try {
+      return (core.config.loadConfig() as CoreConfig) ?? cfg;
+    } catch {
+      return cfg;
+    }
+  };
 
   const startedAt = Date.now();
   let activeJobs = 0;
@@ -313,8 +322,13 @@ export async function monitorGoChatProvider(
     },
     abortSignal: opts.abortSignal,
     statusProvider: () => {
-      const accountIds = listGoChatAccountIds(cfg);
-      const runtimeModel = resolveRuntimeModel(cfg);
+      const liveConfig = resolveLiveConfig();
+      const liveAccount = resolveGoChatAccount({
+        cfg: liveConfig,
+        accountId: opts.accountId,
+      });
+      const accountIds = listGoChatAccountIds(liveConfig);
+      const runtimeModel = resolveRuntimeModel(liveConfig);
       return {
         type: "plugin",
         version: getPluginVersion(),
@@ -322,9 +336,10 @@ export async function monitorGoChatProvider(
         status: resolveStatus(),
         uptime: Math.floor((Date.now() - startedAt) / 1000),
         metadata: {
+          runtimeSchemaVersion: "1",
           openclawVersion: core.version,
           pluginVersion: getPluginVersion(),
-          accountId: account?.accountId || "default",
+          accountId: liveAccount?.accountId || account?.accountId || "default",
           platform: `${getRuntimePlatform()} (${getRuntimeArch()})`,
           nodeVersion: getNodeVersion(),
           command: runtimeCommand.command,
