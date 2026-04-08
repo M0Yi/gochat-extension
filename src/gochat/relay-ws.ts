@@ -164,6 +164,9 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
               .catch((err) => {
                 onError?.(err instanceof Error ? err : new Error(String(err)));
               });
+          } else if (parsed.type === "runtime.refresh") {
+            log("info", `recv runtime refresh request: reason=${parsed.reason || "manual"}`);
+            sendStatusNow();
           } else if (parsed.type === "reply") {
             log("info", `recv reply: conv=${parsed.conversationId || "default"} text="${(parsed.text || "").substring(0, 60)}..."`);
           } else if (parsed.type === "pong") {

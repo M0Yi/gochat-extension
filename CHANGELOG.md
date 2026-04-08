@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.8-plugin.18] - 2026-04-08
+
+### Fixed
+- Shell installer now creates the base OpenClaw config before relay registration so fresh installs can save pairing credentials immediately instead of waiting for first gateway startup
+- Shell installer now retries relay registration and preserves the configured device name when requesting new relay credentials
+
+## [2026.4.8-plugin.17] - 2026-04-08
+
+### Added
+- Added plugin-side runtime refresh handling so the server can request an immediate parameter/status resync after model or runtime parameter changes
+- Added runtime schema version metadata for the standardized runtime parameter sync protocol
+
+### Changed
+- Relay runtime status snapshots now reload the latest OpenClaw config before reporting current model and account metadata
+
 ## [2026.4.8-plugin.16] - 2026-04-08
 
 ### Added

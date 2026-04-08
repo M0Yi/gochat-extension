@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.16"
+VERSION="2026.4.8-plugin.18"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -674,10 +674,9 @@ register_relay() {
     return 0
   fi
 
-  if [ ! -f "${config_file}" ]; then
-    warn "Config not found (${config_file}). Will register on first gateway start."
-    return 0
-  fi
+  # Create the base config up front so fresh installs can be registered
+  # immediately instead of waiting for the first gateway startup.
+  ensure_gochat_install_defaults "${config_file}" "relay"
 
   local existing_id
   existing_id="$(node -e "
@@ -698,11 +697,38 @@ register_relay() {
 
   info "Registering with relay platform..."
   local reg_response
-  reg_response="$(curl -sf -X POST "${RELAY_HTTP_URL}/api/plugin/register" \
-    -H "Content-Type: application/json" \
-    -d '{"name":"OpenClaw GoChat Plugin"}' \
-    --connect-timeout 10 \
-    --max-time 15 2>/dev/null || true)"
+  local device_name
+  local device_name_json
+  device_name="$(node -e "
+    try {
+      const c = JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
+      const g = c.channels && c.channels.gochat;
+      process.stdout.write(String(g && g.name ? g.name : 'OpenClaw GoChat Plugin'));
+    } catch {
+      process.stdout.write('OpenClaw GoChat Plugin');
+    }
+  " "${config_file}" 2>/dev/null || true)"
+  [ -z "${device_name}" ] && device_name="OpenClaw GoChat Plugin"
+  device_name_json="$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" "${device_name}" 2>/dev/null || true)"
+  [ -z "${device_name_json}" ] && device_name_json='"OpenClaw GoChat Plugin"'
+
+  local attempt=1
+  local max_attempts=3
+  while [ "${attempt}" -le "${max_attempts}" ]; do
+    reg_response="$(curl -sf -X POST "${RELAY_HTTP_URL}/api/plugin/register" \
+      -H "Content-Type: application/json" \
+      -d "{\"name\":${device_name_json}}" \
+      --connect-timeout 10 \
+      --max-time 15 2>/dev/null || true)"
+    if [ -n "${reg_response}" ]; then
+      break
+    fi
+    if [ "${attempt}" -lt "${max_attempts}" ]; then
+      warn "Relay registration attempt ${attempt}/${max_attempts} failed. Retrying..."
+      sleep 2
+    fi
+    attempt=$((attempt + 1))
+  done
 
   if [ -z "${reg_response}" ]; then
     warn "Registration failed (network error). Will auto-register on first gateway start."
