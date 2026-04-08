@@ -19,6 +19,11 @@ import { fileURLToPath } from "node:url";
 let _pluginVersion: string | null = null;
 const ACTIVE_STATUS_REFRESH_MS = 10_000;
 
+type RuntimeCommandSnapshot = {
+  command: string;
+  commandArgs: string;
+};
+
 function getPluginVersion(): string {
   if (_pluginVersion) return _pluginVersion;
   try {
@@ -59,6 +64,96 @@ function getNodeVersion(): string {
   return process.version;
 }
 
+function resolvePrimaryModelFromConfig(cfg: CoreConfig): string {
+  const model = (cfg as { agents?: { defaults?: { model?: unknown } } }).agents?.defaults?.model;
+  if (typeof model === "string") {
+    return model.trim();
+  }
+  if (model && typeof model === "object") {
+    const primary = (model as { primary?: unknown }).primary;
+    if (typeof primary === "string") {
+      return primary.trim();
+    }
+  }
+  return "";
+}
+
+function normalizeProcessCommandArgs(argv: string[]): string[] {
+  const args = [...argv];
+  if (!args.length) {
+    return [];
+  }
+
+  const first = args[0] ?? "";
+  if (/[/\\]node(?:\.exe)?$/i.test(first)) {
+    args.shift();
+  }
+
+  const next = args[0] ?? "";
+  if (
+    next.endsWith("/openclaw.mjs") ||
+    next.endsWith("\\openclaw.mjs") ||
+    /[/\\]openclaw(?:\.cmd|\.ps1|\.exe)?$/i.test(next)
+  ) {
+    args.shift();
+  }
+
+  return args.map((entry) => String(entry).trim()).filter(Boolean);
+}
+
+function findCliFlagValue(args: string[], flag: string): string {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === flag) {
+      return String(args[index + 1] ?? "").trim();
+    }
+    if (arg.startsWith(`${flag}=`)) {
+      return arg.slice(flag.length + 1).trim();
+    }
+  }
+  return "";
+}
+
+function resolveRuntimeCommandSnapshot(): RuntimeCommandSnapshot {
+  const normalizedArgs = normalizeProcessCommandArgs(process.argv);
+  if (!normalizedArgs.length) {
+    return {
+      command: "openclaw",
+      commandArgs: "",
+    };
+  }
+
+  const [command, ...rest] = normalizedArgs;
+  return {
+    command,
+    commandArgs: rest.join(" "),
+  };
+}
+
+function resolveRuntimeModel(cfg: CoreConfig): { currentModel: string; modelSource: string } {
+  const normalizedArgs = normalizeProcessCommandArgs(process.argv);
+  const cliModel = findCliFlagValue(normalizedArgs, "--model");
+  if (cliModel) {
+    return {
+      currentModel: cliModel,
+      modelSource: "cli",
+    };
+  }
+
+  const configuredModel = resolvePrimaryModelFromConfig(cfg);
+  if (configuredModel) {
+    return {
+      currentModel: configuredModel,
+      modelSource: "config",
+    };
+  }
+
+  return {
+    currentModel: "unknown",
+    modelSource: "unknown",
+  };
+}
+
 export async function monitorGoChatProvider(
   opts: {
     accountId?: string;
@@ -88,6 +183,7 @@ export async function monitorGoChatProvider(
     channel: "gochat",
     accountId: account.accountId,
   });
+  const runtimeCommand = resolveRuntimeCommandSnapshot();
 
   const startedAt = Date.now();
   let activeJobs = 0;
@@ -219,6 +315,7 @@ export async function monitorGoChatProvider(
     abortSignal: opts.abortSignal,
     statusProvider: () => {
       const accountIds = listGoChatAccountIds(cfg);
+      const runtimeModel = resolveRuntimeModel(cfg);
       return {
         type: "plugin",
         version: getPluginVersion(),
@@ -231,6 +328,10 @@ export async function monitorGoChatProvider(
           accountId: account?.accountId || "default",
           platform: `${getRuntimePlatform()} (${getRuntimeArch()})`,
           nodeVersion: getNodeVersion(),
+          command: runtimeCommand.command,
+          commandArgs: runtimeCommand.commandArgs,
+          currentModel: runtimeModel.currentModel,
+          modelSource: runtimeModel.modelSource,
         },
       };
     },
