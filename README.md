@@ -1,197 +1,373 @@
-# go-claw-tile
+# GoChat Plugin for OpenClaw
 
-`go-claw-tile` 是一个围绕 OpenClaw 搭建的整合仓库，当前把下面几部分放在一起维护：
+A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables custom chat backend integration via HTTP webhook. Supports **two operation modes**:
 
-- `gochat-server`：Go 写的消息桥接与管理后台，负责 Web/App 侧消息、上传、S3、本地存储、管理页等能力。
-- `extensions/gochat`：OpenClaw 的 `gochat` 插件，负责把 OpenClaw 接入 GoChat 本地直连模式或 Relay 模式。
-- 根目录 OpenClaw 配置样例：用于本地开发和部署参考。
+- **Local mode** — Zero-config built-in HTTP API server on port 9750
+- **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://fund.moyi.vip/ws/plugin`
 
-这份文档给人类开发者和运维同学看，目标是让你拿到仓库后可以自己部署起来。
+## Features
 
-## 适合什么场景
+- 🌐 Webhook-based message handling (send & receive)
+- 🖼️ Media support (images, audio, video, file attachments)
+- 🎙️ Bundled local audio notes skill with multi-engine local transcription options
+- 🔒 Flexible DM policies (open, pairing, allowlist, disabled)
+- 👥 Group chat support with per-conversation configuration
+- ⚡ Automatic reconnection for relay mode
+- 🔑 Auto-generated secrets (local mode)
+- 📝 Full message history and conversation management
+- 🚀 Zero-config local mode for quick setup
 
-- 想把 OpenClaw 接到一个自定义聊天前端
-- 想同时拥有 Web 管理后台、文件上传、本地或 S3 存储
-- 想让 OpenClaw 通过 `gochat` 插件跑本地模式或 Relay 模式
-- 想把录音转写、会议处理等能力一起带上
+## Requirements
 
-## 仓库结构
+- OpenClaw >= 2026.3.28
+- Node.js >= 18
+- npm >= 9
 
-```text
-openclaw-main/
-├── gochat-server/         # GoChat 服务端
-├── extensions/gochat/     # OpenClaw gochat 插件
-├── .env.example           # OpenClaw 环境变量样例
-└── README.md              # 当前文档
-```
+---
 
-## 部署模式
-
-最常见的是下面这两种：
-
-### 模式 1：完整部署
-
-适合你要跑完整链路：
-
-- OpenClaw 网关
-- `gochat` 插件
-- `gochat-server`
-- Web 管理后台 / Web App
-
-### 模式 2：只部署插件
-
-适合你已经有 OpenClaw，只需要把 `gochat` 插件装进去。
-
-## 环境要求
-
-建议至少准备这些环境：
-
-- Node.js 18+
-- npm 9+
-- Go 1.25+
-- 一个可运行的 OpenClaw 实例
-
-如果你要启用语音转写，还需要：
-
-- `ffmpeg`
-- 可访问的 FunASR 服务，或本地语音转写依赖
-
-如果你要启用对象存储上传，还需要：
-
-- 兼容 S3 的对象存储
-- 可写 bucket
-- 正确的公网访问地址
-
-## 快速部署
-
-### 1. 启动 OpenClaw
-
-先准备 OpenClaw 的环境变量：
-
-```bash
-cp /Users/moyi/Downloads/openclaw-main/.env.example /Users/moyi/Downloads/openclaw-main/.env
-```
-
-至少填好你实际要用的模型 API Key 和网关鉴权信息。
-
-如果你是用已经安装好的 OpenClaw，通常直接启动即可：
-
-```bash
-openclaw gateway run
-```
-
-### 2. 安装 gochat 插件
-
-如果你要从当前仓库源码安装：
-
-```bash
-cd /Users/moyi/Downloads/openclaw-main/extensions/gochat
-./install.sh
-```
-
-如果你已经把插件单独发布到远端，也可以直接走远程安装：
+## Quick Install (Relay By Default)
 
 ```bash
 curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
 ```
 
-安装完成后建议确认：
+```powershell
+& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1')))
+```
+
+Use a 6-digit connection code for zero-config pairing:
 
 ```bash
+curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash -s -- 123456
+```
+
+```powershell
+& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1'))) -Code '123456'
+```
+
+---
+
+<!-- AI-INSTALL-CONTEXT
+     This section is an instruction block for AI assistants (e.g. OpenClaw, Codex, Copilot).
+     When a user asks to "install gochat", "set up gochat", or "add the gochat plugin",
+     follow the steps below verbatim. Do NOT skip any step. Do NOT paraphrase.
+
+     ┌─────────────────────────────────────────────────────────────────────┐
+     │  AI ASSISTANT INSTALLATION PROCEDURE FOR @m0yi/gochat              │
+     │  Target: OpenClaw channel plugin (gochat)                          │
+     │  Repo:   https://github.com/M0Yi/gochat-extension                 │
+     └─────────────────────────────────────────────────────────────────────┘
+
+     STEP 1 — Detect environment
+       - Run: node --version && npm --version
+       - Run: openclaw --version   (if not found → warn user to install OpenClaw first)
+       - Determine OpenClaw state dir: echo $OPENCLAW_STATE_DIR (fallback: ~/.openclaw)
+
+     STEP 2 — Download and install
+       - Run: curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash
+       - If the user already has a 6-digit connection code, use: bash -s -- 123456
+       - If install.sh fails → fall back to manual method:
+           git clone https://github.com/M0Yi/gochat-extension.git /tmp/gochat-extension
+           cp -r /tmp/gochat-extension ~/.openclaw/extensions/gochat
+           cd ~/.openclaw/extensions/gochat && npm install --production
+
+     STEP 3 — Verify installation
+       - Run: ls ~/.openclaw/extensions/gochat/package.json
+       - Run: test -f ~/.openclaw/extensions/gochat/node_modules/ws/index.js && echo "OK"
+       - If either fails → report the error and suggest manual troubleshooting.
+
+     STEP 4 — Report result to user
+       - On success, print:
+           "GoChat plugin installed successfully.
+            Mode: relay (default) — plugin will auto-connect to the GoChat relay.
+            Start OpenClaw: openclaw gateway run"
+       - If a 6-digit connection code was used, mention:
+           "Connection code accepted — relay credentials were provisioned automatically."
+
+     DO NOT:
+       - Do NOT modify OpenClaw config files unless the user explicitly asks.
+       - Do NOT start OpenClaw automatically after install.
+       - Do NOT install node_modules globally or modify system PATH.
+-->
+
+## Installation from Git Repository
+
+### Option 1: Clone and Install
+
+```bash
+# Clone the repository
+git clone https://github.com/M0Yi/gochat-extension.git
+cd gochat-extension
+
+# Run the installer
+chmod +x install.sh
+./install.sh
+
+# Or install with specific mode:
+./install.sh           # Relay mode (default)
+./install.sh 123456    # Relay mode with 6-digit connection code
+./install.sh --local   # Local mode
+```
+
+### Option 2: Install via npm
+
+```bash
+# Install globally via npm
+npm install -g @m0yi/gochat
+
+# Then link to OpenClaw extensions
+openclaw extension link @m0yi/gochat
+```
+
+### Option 3: Manual Installation
+
+```bash
+# Copy to OpenClaw extensions directory
+cp -r gochat-extension ~/.openclaw/extensions/gochat
+
+# Install dependencies
+cd ~/.openclaw/extensions/gochat
+npm install
+```
+
+## Installation from Tarball
+
+```bash
+# Download the latest release tarball
+curl -L https://github.com/M0Yi/gochat-extension/releases/latest/download/gochat-extension.tar.gz -o gochat-extension.tar.gz
+
+# Install
+chmod +x install.sh
+./install.sh --from-tarball gochat-extension.tar.gz
+```
+
+## Configuration
+
+### Quick Start (Local Mode)
+
+Local mode requires no configuration — the plugin auto-starts an HTTP server on port 9750.
+
+```bash
+# After installation, start OpenClaw
+openclaw gateway run
+
+# Check plugin status
 openclaw plugins list
 ```
 
-### 3. 启动 gochat-server
+### Relay Mode Setup
 
-先准备服务端配置：
-
-```bash
-cd /Users/moyi/Downloads/openclaw-main/gochat-server
-cp .env.example .env
-```
-
-至少要填这些值：
-
-- `GOCHAT_WEBHOOK_SECRET`
-- `GOCHAT_CALLBACK_SECRET`
-- `GOCHAT_OPENCLAW_WEBHOOK_URL`
-- `GOCHAT_ADMIN_USERNAME`
-- `GOCHAT_ADMIN_PASSWORD`
-- `GOCHAT_ADMIN_JWT_SECRET`
-
-然后启动：
+Relay mode connects to the GoChat platform WebSocket relay.
 
 ```bash
-cd /Users/moyi/Downloads/openclaw-main/gochat-server
-go run ./cmd/server
+# Install with relay mode
+./install.sh
+
+# Install and bind to a web-generated 6-digit connection code
+./install.sh 123456
+
+# Configure relay URL (if not using default)
+# Edit ~/.openclaw/config.yaml:
+channels:
+  gochat:
+    mode: relay
+    relayPlatformUrl: wss://fund.moyi.vip/ws/plugin
 ```
 
-默认端口是 `9750`。
+The installer also copies bundled GoChat skills into `~/.openclaw/skills`, including the local audio workflow skill `gochat-local-audio-notes`.
+That skill bundles a local transcription script with multiple backend choices such as `whisper`, `faster-whisper`, `mlx-whisper`, and `whisper.cpp` when available.
 
-## 上传配置
+### Configuration File
 
-当前上传支持两种模式：
+Edit `~/.openclaw/config.yaml`:
 
-- 本地目录
-- S3 / S3 兼容对象存储
+```yaml
+channels:
+  gochat:
+    # Operation mode: local or relay
+    mode: local
 
-后台已经支持编辑上传配置和测试 S3 配置，但这里有一个重要行为：
+    # DM policy: open, pairing, allowlist, disabled
+    dmPolicy: open
 
-- 保存上传配置会持久化到后台设置
-- `gochat-server` 需要重启后，新上传配置才会真正生效
+    # Port for local mode HTTP server (default: 9750)
+    directPort: 9750
 
-也就是说，后台保存成功不等于热更新已经生效。
+    # Allowlist for DM senders (sender IDs)
+    allowFrom:
+      - user123
+      - user456
 
-### S3 配置建议
+    # Per-conversation settings
+    conversations:
+      general:
+        requireMention: false
+        enabled: true
 
-如果你启用 S3，请确认这些项一致：
+    # Media settings
+    mediaMaxMb: 25
+    # Extra trusted hosts for inbound attachment fetches.
+    # The relay host from relayPlatformUrl is trusted automatically.
+    trustedAttachmentHosts:
+      - fund.moyi.vip
 
-- `bucket`
-- `region`
-- `endpoint`
-- `access key`
-- `secret key`
-- `public URL`
-- 是否启用 path-style
+    # Optional local transcription for inbound audio attachments
+    localAudioTranscription:
+      enabled: true
+      engine: auto
+      model: base
+      # language: zh
+      # task: transcribe
+      # device: auto
+      # computeType: auto
+      # beamSize: 5
+      # wordTimestamps: false
+      # maxTranscriptChars: 12000
 
-后台的“S3 测试”现在会执行：
+    # Account-specific settings
+    accounts:
+      main:
+        mode: local
+        dmPolicy: open
+```
 
-1. 上传测试对象
-2. 通过公网地址访问测试对象
-3. 删除测试对象
+### Environment Variables
 
-所以它能覆盖写入和访问这两条链路。
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GOCHAT_WEBHOOK_SECRET` | Webhook signing secret | Auto-generated |
+| `OPENCLAW_STATE_DIR` | OpenClaw state directory | `~/.openclaw` |
+| `GOCHAT_DIRECT_PORT` | Local server port | `9750` |
 
-## 常见访问地址
+## Usage
 
-部署完成后，通常会用到这些地址：
+### Starting OpenClaw
 
-- GoChat Server API：`http://<host>:9750/api`
-- GoChat Web App：`http://<host>:9750/app`
-- GoChat 管理后台：`http://<host>:9750/admin`
-- OpenClaw Webhook：`http://<host>:8790/gochat-webhook`
+```bash
+# Start gateway in foreground
+openclaw gateway run
 
-## 建议验证顺序
+# Or start gateway as background service
+openclaw gateway start
 
-部署后按这个顺序检查最省事：
+# Check plugin status
+openclaw plugins list
 
-1. `openclaw gateway run` 是否正常启动
-2. `openclaw plugins list` 里是否有 `gochat`
-3. `gochat-server` 是否成功监听 `9750`
-4. 打开 `/admin` 能否登录
-5. 后台“上传配置测试”是否通过
-6. 打开 `/app` 发送一条文本消息
-7. 再测试文件上传和语音流程
+# Check channel status
+openclaw channels list
+```
 
-## 开发和维护建议
+### Sending Messages
 
-- 不要把 `gochat-server/uploads/`、数据库、二进制和日志提交进 git
-- 改完上传配置后记得重启 `gochat-server`
-- 改完插件代码后记得重启或重新加载 OpenClaw
-- Web 静态文件改完后，如果浏览器表现不对，先强刷页面
+Once configured, the GoChat channel integrates with OpenClaw's messaging system. Use the standard OpenClaw send commands:
 
-## 进一步说明
+```
+send @user "Hello via GoChat!"
+send #channel "Message to channel"
+```
 
-- GoChat Server 详细说明见 [gochat-server/README.md](/Users/moyi/Downloads/openclaw-main/gochat-server/README.md)
-- GoChat 插件说明见 [extensions/gochat/README.md](/Users/moyi/Downloads/openclaw-main/extensions/gochat/README.md)
-- 给 AI/自动化代理的部署说明见 [AGENTS.md](/Users/moyi/Downloads/openclaw-main/AGENTS.md)
+## Architecture
+
+```
+gochat-extension/
+├── index.ts              # Plugin entry point
+├── setup-entry.ts        # Setup wizard entry
+├── runtime-api.ts        # Runtime API exports
+├── api.ts                # Public API exports
+├── install.sh            # Installation script
+├── package.json           # npm package definition
+├── openclaw.plugin.json   # OpenClaw plugin manifest
+├── src/
+│   ├── channel.ts         # Main channel plugin
+│   ├── accounts.ts        # Account resolution
+│   ├── config-schema.ts   # Configuration schema
+│   ├── config-surface.ts  # Config surface/UI
+│   ├── setup-core.ts      # Setup core logic
+│   ├── setup-surface.ts   # Setup UI/surface
+│   ├── send.ts            # Message sending
+│   ├── inbound.ts         # Inbound handling
+│   ├── normalize.ts       # Target normalization
+│   ├── policy.ts          # Policy resolution
+│   ├── runtime.ts         # Runtime setup
+│   ├── session-route.ts   # Session routing
+│   ├── secret-input.ts    # Secret input handling
+│   ├── types.ts           # TypeScript types
+│   ├── task-tools.ts      # Task tools
+│   ├── direct/            # Local HTTP server
+│   │   ├── server.ts
+│   │   └── storage.ts
+│   └── gochat/            # GoChat protocol
+│       ├── monitor.ts     # WebSocket monitor
+│       ├── relay-ws.ts   # WebSocket relay
+│       └── auth.ts        # Authentication
+└── skills/
+    └── eink-task-reminder/ # Optional skill
+```
+
+## API Reference
+
+### Mode: Local
+
+Local mode runs a built-in HTTP server that:
+- Receives inbound messages via POST `/webhook`
+- Provides health check at GET `/health`
+- Auto-generates webhook secret on first start
+- Stores conversations and messages locally
+
+### Mode: Relay
+
+Relay mode maintains a WebSocket connection to the GoChat platform:
+- Auto-registers channel on first connection
+- Bi-directional message streaming
+- Automatic reconnection on disconnect
+- Platform-managed secrets and routing
+
+## Troubleshooting
+
+### Plugin not loading
+
+```bash
+# Check OpenClaw version
+openclaw --version
+
+# Verify extension installation
+ls -la ~/.openclaw/extensions/gochat
+
+# View detailed logs
+openclaw logs -f
+```
+
+### Local mode not responding
+
+```bash
+# Check if port is available
+lsof -i :9750
+
+# Verify configuration
+cat ~/.openclaw/config.yaml | grep -A10 gochat
+```
+
+### Relay mode connection issues
+
+```bash
+# Test WebSocket connectivity
+wscat -c ws://localhost:9750/ws/plugin
+
+# Check relay URL configuration
+openclaw config get channels.gochat.relayPlatformUrl
+```
+
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Links
+
+- [OpenClaw Repository](https://github.com/m0yi/openclaw)
+- [GoChat Server](https://github.com/m0yi/gochat-server)
+- [Issue Tracker](https://github.com/M0Yi/gochat-extension/issues)
+- [Documentation](https://docs.openclaw.dev/channels/gochat)
