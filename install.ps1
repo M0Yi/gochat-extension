@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.8-plugin.19"
+$VERSION = "2026.4.8-plugin.20"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -37,6 +37,46 @@ function Exit-WithError {
     param([string]$Message)
     Write-Fail $Message
     exit 1
+}
+
+function Get-VersionTriplet {
+    param([string]$RawVersion)
+    if (-not $RawVersion) {
+        return ""
+    }
+    $match = [regex]::Match($RawVersion, '\d{4}\.\d{1,2}\.\d{1,2}')
+    if ($match.Success) {
+        return $match.Value
+    }
+    return ""
+}
+
+function Get-VersionTripletKey {
+    param([string]$Triplet)
+    if (-not $Triplet) {
+        return $null
+    }
+    $parts = $Triplet.Split(".")
+    if ($parts.Length -lt 3) {
+        return $null
+    }
+    return ("{0:D4}{1:D2}{2:D2}" -f [int]$parts[0], [int]$parts[1], [int]$parts[2])
+}
+
+function Warn-IfKnownPairingBugHost {
+    param([string]$RawVersion)
+    $triplet = Get-VersionTriplet $RawVersion
+    if (-not $triplet) {
+        return
+    }
+    $key = Get-VersionTripletKey $triplet
+    if (-not $key) {
+        return
+    }
+    if ([int64]$key -lt 20260408) {
+        Write-Warn "OpenClaw $triplet is older than 2026.4.8 and is known to surface local subagent pairing-required failures."
+        Write-Warn "GoChat $VERSION adds runtime auto-repair polling as a mitigation, but upgrading OpenClaw is still recommended."
+    }
 }
 
 function Get-JsonValue {
@@ -134,6 +174,7 @@ function Ensure-Prerequisites {
         $Script:OpenClawVersion = & $Script:OpenClawBin --version 2>$null | Select-Object -First 1
         if ($Script:OpenClawVersion) {
             Write-Info "OpenClaw version: $($Script:OpenClawVersion)"
+            Warn-IfKnownPairingBugHost $Script:OpenClawVersion
         }
     } else {
         Write-Warn "OpenClaw CLI not found. The extension will install, but OpenClaw must be installed before use."

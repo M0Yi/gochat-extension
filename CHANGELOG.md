@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.8-plugin.20] - 2026-04-08
+
+### Fixed
+- Relay runtime now keeps a short-lived local gateway access watch active while GoChat is executing work, so safe local CLI repair requests that appear mid-session can still be auto-approved instead of only being checked during install or plugin startup
+- Relay runtime now retries the same safe gateway access bootstrap after relay-side errors, reducing `pairing required` interruptions on older local OpenClaw builds that still surface loopback scope-upgrade repair windows during subagent or operator actions
+
 ## [2026.4.8-plugin.19] - 2026-04-08
 
 ### Added

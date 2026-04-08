@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.19"
+VERSION="2026.4.8-plugin.20"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -40,6 +40,37 @@ info()  { printf "${CYAN}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
 ok()    { printf "${GREEN}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
 warn()  { printf "${YELLOW}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
 fail()  { printf "${RED}${BOLD}[gochat]${NC} %s\n" "$*" >&2; }
+
+extract_version_triplet() {
+  local raw="$1"
+  printf '%s' "${raw}" | grep -oE '[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}' | head -1 || true
+}
+
+version_triplet_key() {
+  local triplet="$1"
+  local year month day
+  IFS='.' read -r year month day <<EOF
+${triplet}
+EOF
+  [ -z "${year:-}" ] && return 1
+  [ -z "${month:-}" ] && return 1
+  [ -z "${day:-}" ] && return 1
+  printf '%04d%02d%02d\n' "${year}" "${month}" "${day}"
+}
+
+warn_if_known_pairing_bug_host() {
+  local raw_version="$1"
+  local parsed
+  local parsed_key
+  parsed="$(extract_version_triplet "${raw_version}")"
+  [ -z "${parsed}" ] && return 0
+  parsed_key="$(version_triplet_key "${parsed}" || true)"
+  [ -z "${parsed_key}" ] && return 0
+  if [ "${parsed_key}" -lt 20260408 ]; then
+    warn "OpenClaw ${parsed} is older than 2026.4.8 and is known to surface local subagent pairing-required failures."
+    warn "GoChat ${VERSION} adds runtime auto-repair polling as a mitigation, but upgrading OpenClaw is still recommended."
+  fi
+}
 
 # ──────────────────────────────────────────────
 # JSON parsing helper (WSL-safe)
@@ -913,6 +944,7 @@ main() {
     local oc_version
     oc_version="$("${OPENCLAW_BIN}" --version 2>/dev/null | head -1 || echo "unknown")"
     info "OpenClaw version: ${oc_version}"
+    warn_if_known_pairing_bug_host "${oc_version}"
   else
     warn "OpenClaw CLI not found. Extension will install but won't work until OpenClaw is installed."
   fi

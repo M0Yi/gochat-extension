@@ -23,6 +23,8 @@ A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables c
 - Node.js >= 18
 - npm >= 9
 
+OpenClaw `2026.4.8` or newer is recommended if you rely on local subagents or other operator actions that hop back through the gateway during a GoChat-triggered run.
+
 ---
 
 ## Quick Install (Relay By Default)
@@ -177,6 +179,7 @@ channels:
 The installer also copies bundled GoChat skills into `~/.openclaw/skills`, including the local audio workflow skill `gochat-local-audio-notes`.
 That skill bundles a local transcription script with multiple backend choices such as `whisper`, `faster-whisper`, `mlx-whisper`, and `whisper.cpp` when available.
 When OpenClaw is already running locally, the installer also tries to normalize local loopback gateway URLs and auto-approve the current CLI's safe local repair request so GoChat-triggered local operator actions keep full scopes without a manual `openclaw devices approve`.
+The relay runtime also keeps a short local gateway-access watch alive during active jobs and after relay errors, so older OpenClaw builds that still open loopback repair windows during subagent/operator actions have another chance to self-heal before the next attempt.
 
 ### Configuration File
 
