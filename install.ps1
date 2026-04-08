@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.8-plugin.22"
+$VERSION = "2026.4.8-plugin.23"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -27,6 +27,7 @@ $Script:OpenClawBin = ""
 $Script:OpenClawVersion = ""
 $Script:NodeVersion = ""
 $Script:NpmBin = ""
+$Script:ModeSwitchChanged = $false
 
 function Write-Info($msg)  { Write-Host "`e[36;1m[gochat]`e[0m $msg" }
 function Write-Ok($msg)    { Write-Host "`e[32;1m[gochat]`e[0m $msg" }
@@ -79,15 +80,86 @@ function Warn-IfKnownPairingBugHost {
     }
 }
 
-function Test-GatewayAccessBootstrapCommand {
-    if (-not $Script:OpenClawBin) {
-        return $false
+function Get-GoChatCurrentMode {
+    param([string]$ConfigFile)
+    if (-not (Test-Path $ConfigFile)) {
+        return ""
     }
     try {
-        $helpOutput = & $Script:OpenClawBin gochat --help 2>&1 | Out-String
-        return $helpOutput -match "ensure-gateway-access"
+        $raw = Get-Content -Path $ConfigFile -Raw
+        return (Get-JsonValue $raw "channels.gochat.mode")
+    } catch {
+        return ""
+    }
+}
+
+function Test-GoChatModeSwitchAuthorization {
+    param(
+        [string]$ConfigFile,
+        [string]$TargetMode
+    )
+
+    if (-not (Test-Path $ConfigFile)) {
+        return $false
+    }
+
+    try {
+        & node -e @"
+const fs = require('fs');
+const cfg = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+const targetMode = String(process.argv[2] || '');
+const auth = cfg.channels && cfg.channels.gochat && cfg.channels.gochat.modeSwitchAuthorization;
+if (!auth || auth.targetMode !== targetMode) process.exit(1);
+if (auth.expiresAt) {
+  const expires = new Date(auth.expiresAt);
+  if (Number.isNaN(expires.getTime()) || expires.getTime() <= Date.now()) process.exit(1);
+}
+"@ $ConfigFile $TargetMode 2>$null | Out-Null
+        return $LASTEXITCODE -eq 0
     } catch {
         return $false
+    }
+}
+
+function Require-GoChatModeSwitchAuthorization {
+    param(
+        [string]$ConfigFile,
+        [string]$TargetMode
+    )
+
+    $Script:ModeSwitchChanged = $false
+    $currentMode = Get-GoChatCurrentMode $ConfigFile
+    if (-not $currentMode -or $currentMode -eq $TargetMode) {
+        return
+    }
+
+    if (Test-GoChatModeSwitchAuthorization -ConfigFile $ConfigFile -TargetMode $TargetMode) {
+        $Script:ModeSwitchChanged = $true
+        Write-Info "Using one-time mode switch authorization: $currentMode -> $TargetMode"
+        return
+    }
+
+    Exit-WithError "Switching GoChat mode from $currentMode to $TargetMode requires explicit authorization. Run: openclaw gochat authorize-mode-switch --mode $TargetMode"
+}
+
+function Consume-GoChatModeSwitchAuthorization {
+    param([string]$ConfigFile)
+
+    if (-not $Script:ModeSwitchChanged) {
+        return
+    }
+
+    try {
+        & node -e @"
+const fs = require('fs');
+const file = process.argv[1];
+const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
+if (cfg.channels && cfg.channels.gochat && cfg.channels.gochat.modeSwitchAuthorization) {
+  delete cfg.channels.gochat.modeSwitchAuthorization;
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
+}
+"@ $ConfigFile 2>$null | Out-Null
+    } catch {
     }
 }
 
@@ -466,10 +538,6 @@ next.enabled = true;
 next.name = name || current.name || 'OpenClaw GoChat Plugin';
 next.dmPolicy = 'open';
 next.blockStreaming = true;
-next.gatewayAccess = Object.assign({
-  autoApproveLocalRepair: true,
-  normalizeLoopbackRemoteUrl: true
-}, current.gatewayAccess || {});
 if (mode === 'local') {
   next.mode = 'local';
   next.directPort = Number(directPort || 9750);
@@ -655,27 +723,6 @@ function Print-RelayStatus {
     Write-Host ""
 }
 
-function Invoke-GatewayAccessBootstrap {
-    if (-not $Script:OpenClawBin) {
-        return
-    }
-
-    if (-not (Test-GatewayAccessBootstrapCommand)) {
-        Write-Warn "Local gateway access bootstrap command is not available on this OpenClaw CLI build yet. It will retry from the plugin runtime after gateway startup."
-        return
-    }
-
-    Write-Info "Bootstrapping local gateway access..."
-    try {
-        & $Script:OpenClawBin gochat ensure-gateway-access 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
-        }
-    } catch {
-        Write-Warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
-    }
-}
-
 function Print-LocalStatus {
     param([string]$ConfigFile)
 
@@ -702,12 +749,14 @@ function Configure-Relay {
     param([string]$PairCode)
 
     $configFile = Join-Path (Get-OpenClawDir) "openclaw.json"
+    Require-GoChatModeSwitchAuthorization -ConfigFile $configFile -TargetMode "relay"
     $snapshot = Get-GoChatConfigSnapshot $configFile
     $deviceName = if ($snapshot.Name) { $snapshot.Name } else { Get-DefaultDeviceName }
 
     if ($PairCode) {
         $claimed = Claim-ConnectionCode -PairCode $PairCode -DeviceName $deviceName
         Write-GoChatConfig -ConfigFile $configFile -Mode "relay" -Name $claimed.Name -RelayUrl $claimed.RelayUrl -ChannelId $claimed.ChannelId -Secret $claimed.Secret
+        Consume-GoChatModeSwitchAuthorization -ConfigFile $configFile
         Write-Ok "Connection code accepted. channelId=$($claimed.ChannelId)"
         Print-RelayStatus $configFile
         return
@@ -715,6 +764,7 @@ function Configure-Relay {
 
     if ($snapshot.ChannelId -and $snapshot.Secret) {
         Write-GoChatConfig -ConfigFile $configFile -Mode "relay" -Name $deviceName -RelayUrl $(if ($snapshot.RelayUrl) { $snapshot.RelayUrl } else { $RELAY_WS_URL }) -ChannelId $snapshot.ChannelId -Secret $snapshot.Secret
+        Consume-GoChatModeSwitchAuthorization -ConfigFile $configFile
         Write-Info "Existing relay credentials found. Keeping channelId=$($snapshot.ChannelId)"
         Print-RelayStatus $configFile
         return
@@ -726,18 +776,21 @@ function Configure-Relay {
     }
 
     Write-GoChatConfig -ConfigFile $configFile -Mode "relay" -Name $registered.Name -RelayUrl $registered.RelayUrl -ChannelId $registered.ChannelId -Secret $registered.Secret
+    Consume-GoChatModeSwitchAuthorization -ConfigFile $configFile
     Write-Ok "Relay registered. channelId=$($registered.ChannelId)"
     Print-RelayStatus $configFile
 }
 
 function Configure-Local {
     $configFile = Join-Path (Get-OpenClawDir) "openclaw.json"
+    Require-GoChatModeSwitchAuthorization -ConfigFile $configFile -TargetMode "local"
     $snapshot = Get-GoChatConfigSnapshot $configFile
     $deviceName = if ($snapshot.Name) { $snapshot.Name } else { Get-DefaultDeviceName }
     $secret = if ($snapshot.Secret) { $snapshot.Secret } else { New-RandomSecret }
     $port = if ($snapshot.DirectPort) { $snapshot.DirectPort } else { "$DEFAULT_LOCAL_PORT" }
 
     Write-GoChatConfig -ConfigFile $configFile -Mode "local" -Name $deviceName -Secret $secret -DirectPort $port
+    Consume-GoChatModeSwitchAuthorization -ConfigFile $configFile
     Print-LocalStatus $configFile
 }
 
@@ -821,8 +874,6 @@ function Main {
     } else {
         Configure-Relay $Code
     }
-
-    Invoke-GatewayAccessBootstrap
 
     Write-Host ""
     Write-Ok "GoChat is ready!"

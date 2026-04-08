@@ -50,7 +50,6 @@ import { DEFAULT_RELAY_HTTP_URL, DEFAULT_RELAY_WS_URL } from "./types.js";
 import { GoChatDirectStorage } from "./direct/storage.js";
 import { createGoChatDirectServer } from "./direct/server.js";
 import { handleGoChatInbound } from "./inbound.js";
-import { ensureGoChatGatewayAccessOnce } from "./gateway-access.js";
 
 const meta = {
   id: "gochat",
@@ -219,22 +218,6 @@ export const gochatPlugin: ChannelPlugin<ResolvedGoChatAccount> = createChatChan
     gateway: {
       startAccount: async (ctx) => {
         const account = ctx.account;
-
-        void ensureGoChatGatewayAccessOnce({
-          logger: {
-            info: (message) => ctx.log?.info(message),
-            warn: (message) => ctx.log?.warn(message),
-            error: (message) => ctx.log?.error(message),
-          },
-          readConfig: () => getGoChatRuntime().config.loadConfig(),
-          writeConfig: async (cfg) => {
-            await getGoChatRuntime().config.writeConfigFile(cfg as CoreConfig);
-          },
-        }).catch((error) => {
-          ctx.log?.warn(
-            `[gochat:${account.accountId}] gateway access bootstrap failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        });
 
         console.log(`[gochat] ──── GoChat Account Configuration ────`);
         console.log(`[gochat]   accountId:     ${account.accountId}`);

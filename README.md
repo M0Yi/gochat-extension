@@ -109,6 +109,10 @@ chmod +x install.sh
 ./install.sh           # Relay mode (default)
 ./install.sh 123456    # Relay mode with 6-digit connection code
 ./install.sh --local   # Local mode
+
+# Switching an already-configured account to a different mode needs one-time authorization first
+openclaw gochat authorize-mode-switch --mode local
+./install.sh --local
 ```
 
 ### Option 2: Install via npm
@@ -129,7 +133,7 @@ cp -r gochat-extension ~/.openclaw/extensions/gochat
 
 # Install dependencies
 cd ~/.openclaw/extensions/gochat
-npm install
+npm install --omit=dev
 ```
 
 ## Installation from Tarball
@@ -178,8 +182,13 @@ channels:
 
 The installer also copies bundled GoChat skills into `~/.openclaw/skills`, including the local audio workflow skill `gochat-local-audio-notes`.
 That skill bundles a local transcription script with multiple backend choices such as `whisper`, `faster-whisper`, `mlx-whisper`, and `whisper.cpp` when available.
-When OpenClaw is already running locally, the installer also tries to normalize local loopback gateway URLs and auto-approve the current CLI's safe local repair request so GoChat-triggered local operator actions keep full scopes without a manual `openclaw devices approve`.
-The relay runtime also keeps a short local gateway-access watch alive during active jobs and after relay errors, so older OpenClaw builds that still open loopback repair windows during subagent/operator actions have another chance to self-heal before the next attempt.
+Fresh installs stay on the chosen mode and do not run any automatic gateway authorization workflow by default.
+If you explicitly switch an existing account between `local` and `relay`, first authorize that one-time switch from the CLI:
+
+```bash
+openclaw gochat authorize-mode-switch --mode local
+openclaw gochat authorize-mode-switch --mode relay
+```
 
 ### Configuration File
 
@@ -260,7 +269,7 @@ openclaw plugins list
 # Check channel status
 openclaw channels list
 
-# Re-run the local gateway access bootstrap if needed
+# If an older local OpenClaw build needs manual gateway repair help
 openclaw gochat ensure-gateway-access
 ```
 

@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.22"
+VERSION="2026.4.8-plugin.23"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -24,6 +24,7 @@ ARCH=""
 OPENCLAW_BIN=""
 TARBALL_PATH=""
 PIPED_INSTALL=false
+MODE_SWITCH_CHANGED=false
 
 # ──────────────────────────────────────────────
 # Colors
@@ -72,18 +73,79 @@ warn_if_known_pairing_bug_host() {
   fi
 }
 
-openclaw_supports_gateway_access_bootstrap() {
-  if [ -z "${OPENCLAW_BIN}" ]; then
-    return 1
-  fi
+get_gochat_current_mode() {
+  local config_file="$1"
+  [ ! -f "${config_file}" ] && return 0
+  node -e "
+    try {
+      const c = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
+      const mode = c.channels && c.channels.gochat && c.channels.gochat.mode;
+      if (mode) process.stdout.write(String(mode));
+    } catch {}
+  " "${config_file}" 2>/dev/null || true
+}
 
-  local help_output=""
-  help_output="$("${OPENCLAW_BIN}" gochat --help 2>&1 || true)"
-  if printf '%s\n' "${help_output}" | grep -q "ensure-gateway-access"; then
+mode_switch_authorization_matches() {
+  local config_file="$1"
+  local target_mode="$2"
+  [ ! -f "${config_file}" ] && return 1
+  MODE_SWITCH_AUTH_EXPIRES_AT="$(node -e "
+    try {
+      const c = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
+      const auth = c.channels && c.channels.gochat && c.channels.gochat.modeSwitchAuthorization;
+      const target = String(process.argv[2] || '');
+      if (!auth || auth.targetMode !== target) process.exit(1);
+      if (auth.expiresAt) {
+        const expires = new Date(auth.expiresAt);
+        if (Number.isNaN(expires.getTime()) || expires.getTime() <= Date.now()) process.exit(1);
+        process.stdout.write(String(auth.expiresAt));
+      }
+    } catch {
+      process.exit(1);
+    }
+  " "${config_file}" "${target_mode}" 2>/dev/null || true)"
+  [ -n "${MODE_SWITCH_AUTH_EXPIRES_AT:-}" ]
+}
+
+require_mode_switch_authorization_if_needed() {
+  local config_file="$1"
+  local target_mode="$2"
+  local current_mode=""
+  current_mode="$(get_gochat_current_mode "${config_file}")"
+  MODE_SWITCH_CHANGED=false
+
+  if [ -z "${current_mode}" ] || [ "${current_mode}" = "${target_mode}" ]; then
     return 0
   fi
 
-  return 1
+  if mode_switch_authorization_matches "${config_file}" "${target_mode}"; then
+    MODE_SWITCH_CHANGED=true
+    info "Using one-time mode switch authorization: ${current_mode} -> ${target_mode}"
+    return 0
+  fi
+
+  fail "Switching GoChat mode from ${current_mode} to ${target_mode} requires explicit authorization."
+  fail "Run: openclaw gochat authorize-mode-switch --mode ${target_mode}"
+  exit 1
+}
+
+consume_mode_switch_authorization_if_needed() {
+  local config_file="$1"
+  if [ "${MODE_SWITCH_CHANGED}" != "true" ]; then
+    return 0
+  fi
+
+  node -e "
+    try {
+      const fs = require('fs');
+      const file = process.argv[1];
+      const c = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (c.channels && c.channels.gochat && c.channels.gochat.modeSwitchAuthorization) {
+        delete c.channels.gochat.modeSwitchAuthorization;
+        fs.writeFileSync(file, JSON.stringify(c, null, 2) + '\n');
+      }
+    } catch {}
+  " "${config_file}" 2>/dev/null || true
 }
 
 # ──────────────────────────────────────────────
@@ -541,6 +603,8 @@ configure_gochat() {
   openclaw_dir="$(get_openclaw_dir)"
   local config_file="${openclaw_dir}/openclaw.json"
 
+  require_mode_switch_authorization_if_needed "${config_file}" "${mode}"
+
   echo ""
   info "──── GoChat Configuration ────"
   info "  platform:      ${PLATFORM} (${ARCH})"
@@ -563,7 +627,7 @@ configure_gochat() {
     ensure_gochat_install_defaults "${config_file}" "local"
   fi
 
-  attempt_gateway_access_bootstrap
+  consume_mode_switch_authorization_if_needed "${config_file}"
 
   echo ""
   ok "GoChat is ready!"
@@ -617,11 +681,7 @@ ensure_gochat_install_defaults() {
       enabled: true,
       mode: '${mode}',
       dmPolicy: 'open',
-      blockStreaming: true,
-      gatewayAccess: Object.assign({
-        autoApproveLocalRepair: true,
-        normalizeLoopbackRemoteUrl: true
-      }, (c.channels.gochat && c.channels.gochat.gatewayAccess) || {})
+      blockStreaming: true
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || true
@@ -702,11 +762,7 @@ claim_relay_pair_code() {
       webhookSecret: '${reg_secret}',
       relayPlatformUrl: '${reg_relay_url}',
       dmPolicy: 'open',
-      blockStreaming: true,
-      gatewayAccess: Object.assign({
-        autoApproveLocalRepair: true,
-        normalizeLoopbackRemoteUrl: true
-      }, (c.channels.gochat && c.channels.gochat.gatewayAccess) || {})
+      blockStreaming: true
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || {
@@ -814,11 +870,7 @@ register_relay() {
       webhookSecret: '${reg_secret}',
       relayPlatformUrl: '${RELAY_WS_URL}',
       dmPolicy: 'open',
-      blockStreaming: true,
-      gatewayAccess: Object.assign({
-        autoApproveLocalRepair: true,
-        normalizeLoopbackRemoteUrl: true
-      }, (c.channels.gochat && c.channels.gochat.gatewayAccess) || {})
+      blockStreaming: true
     });
     fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
   " 2>/dev/null || {
@@ -839,29 +891,9 @@ ensure_dm_policy_open() {
     if (g) {
       g.dmPolicy = 'open';
       g.blockStreaming = true;
-      g.gatewayAccess = Object.assign({
-        autoApproveLocalRepair: true,
-        normalizeLoopbackRemoteUrl: true
-      }, g.gatewayAccess || {});
       fs.writeFileSync('${config_file}', JSON.stringify(c, null, 2) + '\n');
     }
   " 2>/dev/null || true
-}
-
-attempt_gateway_access_bootstrap() {
-  if [ -z "${OPENCLAW_BIN}" ]; then
-    return 0
-  fi
-
-  if ! openclaw_supports_gateway_access_bootstrap; then
-    warn "Local gateway access bootstrap command is not available on this OpenClaw CLI build yet. It will retry from the plugin runtime after gateway startup."
-    return 0
-  fi
-
-  info "Bootstrapping local gateway access..."
-  if ! "${OPENCLAW_BIN}" gochat ensure-gateway-access >/dev/null 2>&1; then
-    warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
-  fi
 }
 
 print_credentials() {

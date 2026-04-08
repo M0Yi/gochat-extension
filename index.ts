@@ -4,7 +4,9 @@ import { setGoChatRuntime } from "./src/runtime.js";
 import { createGoChatTaskTool } from "./src/task-tools.js";
 import { resolveGoChatAccount } from "./src/accounts.js";
 import type { CoreConfig } from "./src/types.js";
+import { DEFAULT_MODE_SWITCH_AUTH_TTL_MINUTES, grantGoChatModeSwitchAuthorization } from "./src/mode-switch-authorization.js";
 import { ensureGoChatGatewayAccess } from "./src/gateway-access.js";
+import { loadConfig, writeConfigFile } from "openclaw/plugin-sdk/config-runtime";
 
 export { gochatPlugin } from "./src/channel.js";
 export { setGoChatRuntime } from "./src/runtime.js";
@@ -85,8 +87,61 @@ export default defineChannelPluginEntry({
           });
 
         gochatCmd
+          .command("authorize-mode-switch")
+          .description("Authorize the next explicit mode switch for a GoChat account")
+          .requiredOption("--mode <mode>", "Target mode: local or relay")
+          .option("-a, --account <accountId>", "Account ID (default: default account)")
+          .option("--ttl-minutes <minutes>", "Authorization lifetime in minutes", String(DEFAULT_MODE_SWITCH_AUTH_TTL_MINUTES))
+          .option("--json", "Output JSON result")
+          .action(async (options) => {
+            const rawMode = String(options.mode ?? "").trim().toLowerCase();
+            if (rawMode !== "local" && rawMode !== "relay") {
+              console.error("\n✗ Invalid mode. Use --mode local or --mode relay.\n");
+              process.exit(1);
+            }
+
+            const ttlMinutes = Number.parseInt(String(options.ttlMinutes ?? DEFAULT_MODE_SWITCH_AUTH_TTL_MINUTES), 10);
+            if (!Number.isFinite(ttlMinutes) || ttlMinutes <= 0) {
+              console.error("\n✗ Invalid --ttl-minutes value.\n");
+              process.exit(1);
+            }
+
+            try {
+              const accountId = options.account || undefined;
+              const currentCfg = loadConfig() as CoreConfig;
+              const nextCfg = grantGoChatModeSwitchAuthorization({
+                cfg: currentCfg,
+                accountId: accountId ?? "default",
+                targetMode: rawMode,
+                ttlMinutes,
+              });
+              await writeConfigFile(nextCfg as Parameters<typeof writeConfigFile>[0]);
+
+              const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
+              if (options.json) {
+                console.log(JSON.stringify({
+                  accountId: accountId ?? "default",
+                  targetMode: rawMode,
+                  ttlMinutes,
+                  expiresAt,
+                }, null, 2));
+                return;
+              }
+
+              console.log(
+                `Authorized next GoChat mode switch to ${rawMode} for account ${accountId ?? "default"} until ${expiresAt}.`,
+              );
+            } catch (error) {
+              console.error("\n✗ Failed to authorize mode switch:");
+              console.error(`  ${error instanceof Error ? error.message : String(error)}`);
+              console.error("");
+              process.exit(1);
+            }
+          });
+
+        gochatCmd
           .command("ensure-gateway-access")
-          .description("Normalize local gateway routing and auto-approve safe local CLI repair requests")
+          .description("Manually normalize local gateway routing and approve safe local CLI repair requests")
           .option("--json", "Output JSON result")
           .action(async (options) => {
             try {
@@ -134,8 +189,13 @@ export default defineChannelPluginEntry({
             hasSubcommands: false,
           },
           {
+            name: "gochat authorize-mode-switch",
+            description: "Authorize the next GoChat mode switch",
+            hasSubcommands: false,
+          },
+          {
             name: "gochat ensure-gateway-access",
-            description: "Normalize loopback gateway routing and approve safe local CLI repair requests",
+            description: "Manually normalize loopback gateway routing and approve safe local CLI repair requests",
             hasSubcommands: false,
           },
         ],

@@ -14,6 +14,10 @@ import {
   gochatSetupAdapter,
   setGoChatAccountConfig,
 } from "./setup-core.js";
+import {
+  consumeGoChatModeSwitchAuthorization,
+  getGoChatModeSwitchAuthorizationStatus,
+} from "./mode-switch-authorization.js";
 import type { CoreConfig } from "./types.js";
 import { DEFAULT_RELAY_HTTP_URL, DEFAULT_RELAY_WS_URL } from "./types.js";
 
@@ -40,7 +44,7 @@ export const gochatSetupWizard: ChannelSetupWizard = {
     title: "GoChat setup",
     lines: [
       "Choose mode: local (built-in server) or relay (connect to GoChat platform).",
-      "Both modes are fully automatic -- no manual configuration needed.",
+      "Fresh setup is automatic. Switching an existing account between local and relay requires a one-time CLI authorization.",
       `Docs: ${formatDocsLink("/channels/gochat", "channels/gochat")}`,
     ],
     shouldShow: ({ cfg, accountId }) => {
@@ -63,6 +67,22 @@ export const gochatSetupWizard: ChannelSetupWizard = {
       normalizeValue: ({ value }) => (value?.trim().toLowerCase() || "relay") as string,
       applySet: async (params) => {
         const mode = (params.value?.trim().toLowerCase() || "relay") as "local" | "relay";
+        const currentAccount = resolveGoChatAccount({
+          cfg: params.cfg as CoreConfig,
+          accountId: params.accountId,
+        });
+        const authStatus = getGoChatModeSwitchAuthorizationStatus({
+          cfg: params.cfg as CoreConfig,
+          accountId: params.accountId,
+          currentMode: currentAccount.enabled ? currentAccount.mode : "",
+          nextMode: mode,
+        });
+        if (!authStatus.allowed) {
+          throw new Error(
+            `${authStatus.reason} Run: openclaw gochat authorize-mode-switch --mode ${mode}`,
+          );
+        }
+
         let nextCfg = setGoChatAccountConfig(params.cfg as CoreConfig, params.accountId, {
           mode,
           dmPolicy: "open",
@@ -108,6 +128,13 @@ export const gochatSetupWizard: ChannelSetupWizard = {
         } else {
           console.log(`[gochat:setup] local mode configured - built-in server will start on port 9750`);
         }
+
+        nextCfg = consumeGoChatModeSwitchAuthorization({
+          cfg: nextCfg as CoreConfig,
+          accountId: params.accountId,
+          currentMode: currentAccount.enabled ? currentAccount.mode : "",
+          nextMode: mode,
+        });
 
         const finalAccount = resolveGoChatAccount({ cfg: nextCfg as CoreConfig, accountId: params.accountId });
         console.log(`[gochat:setup] ──── Final Config ────`);

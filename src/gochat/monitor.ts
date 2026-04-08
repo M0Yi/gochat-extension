@@ -3,7 +3,6 @@ import {
   type RuntimeEnv,
 } from "openclaw/plugin-sdk/extension-shared";
 import { resolveGoChatAccount, listGoChatAccountIds } from "../accounts.js";
-import { ensureGoChatGatewayAccess } from "../gateway-access.js";
 import { handleGoChatInbound } from "../inbound.js";
 import { getGoChatRuntime } from "../runtime.js";
 import { createRelayWSConnection } from "./relay-ws.js";
@@ -19,10 +18,6 @@ import { fileURLToPath } from "node:url";
 
 let _pluginVersion: string | null = null;
 const ACTIVE_STATUS_REFRESH_MS = 10_000;
-const GATEWAY_ACCESS_POLL_MS = 1_500;
-const GATEWAY_ACCESS_MIN_SPACING_MS = 750;
-const GATEWAY_ACCESS_ACTIVE_WINDOW_MS = 15_000;
-const GATEWAY_ACCESS_ERROR_WINDOW_MS = 20_000;
 
 type RuntimeCommandSnapshot = {
   command: string;
@@ -204,10 +199,6 @@ export async function monitorGoChatProvider(
   let transientUntil = 0;
   let transientTimer: ReturnType<typeof setTimeout> | null = null;
   let activeStatusTimer: ReturnType<typeof setInterval> | null = null;
-  let gatewayAccessTimer: ReturnType<typeof setInterval> | null = null;
-  let gatewayAccessWindowUntil = 0;
-  let gatewayAccessInFlight: Promise<void> | null = null;
-  let gatewayAccessLastAttemptAt = 0;
 
   const clearTransientTimer = (): void => {
     if (transientTimer) {
@@ -220,13 +211,6 @@ export async function monitorGoChatProvider(
     if (activeStatusTimer) {
       clearInterval(activeStatusTimer);
       activeStatusTimer = null;
-    }
-  };
-
-  const stopGatewayAccessWatch = (): void => {
-    if (gatewayAccessTimer) {
-      clearInterval(gatewayAccessTimer);
-      gatewayAccessTimer = null;
     }
   };
 
@@ -244,65 +228,6 @@ export async function monitorGoChatProvider(
   let lastReportedStatus = resolveStatus();
 
   let pushRelayStatusNow = (): void => {};
-
-  const runGatewayAccessCheck = (reason: string): void => {
-    const now = Date.now();
-    if (gatewayAccessInFlight || now - gatewayAccessLastAttemptAt < GATEWAY_ACCESS_MIN_SPACING_MS) {
-      return;
-    }
-    gatewayAccessLastAttemptAt = now;
-    gatewayAccessInFlight = (async () => {
-      try {
-        const result = await ensureGoChatGatewayAccess({
-          logger: {
-            info: (message) => logger.info(message),
-            warn: (message) => logger.warn(message),
-            error: (message) => logger.error(message),
-          },
-          readConfig: () => core.config.loadConfig(),
-          writeConfig: async (nextCfg) => {
-            await core.config.writeConfigFile(nextCfg as CoreConfig);
-          },
-        });
-
-        if (result.approvedRequestId) {
-          logger.info(
-            `[gochat:${account.accountId}] approved local gateway repair request ${result.approvedRequestId} during ${reason}`,
-          );
-          return;
-        }
-
-        if (result.normalizedGatewayRemoteUrlTo) {
-          logger.info(
-            `[gochat:${account.accountId}] normalized gateway.remote.url to ${result.normalizedGatewayRemoteUrlTo} during ${reason}`,
-          );
-        }
-      } catch (error) {
-        logger.warn(
-          `[gochat:${account.accountId}] gateway access check failed during ${reason}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      } finally {
-        gatewayAccessInFlight = null;
-        if (activeJobs <= 0 && Date.now() >= gatewayAccessWindowUntil) {
-          stopGatewayAccessWatch();
-        }
-      }
-    })();
-  };
-
-  const extendGatewayAccessWindow = (ttlMs: number, reason: string): void => {
-    gatewayAccessWindowUntil = Math.max(gatewayAccessWindowUntil, Date.now() + ttlMs);
-    if (!gatewayAccessTimer) {
-      gatewayAccessTimer = setInterval(() => {
-        if (activeJobs <= 0 && Date.now() >= gatewayAccessWindowUntil) {
-          stopGatewayAccessWatch();
-          return;
-        }
-        runGatewayAccessCheck("runtime poll");
-      }, GATEWAY_ACCESS_POLL_MS);
-    }
-    runGatewayAccessCheck(reason);
-  };
 
   const ensureActiveStatusPulse = (): void => {
     if (activeJobs <= 0 || activeStatusTimer) {
@@ -352,7 +277,6 @@ export async function monitorGoChatProvider(
   const beginJob = (): void => {
     activeJobs += 1;
     ensureActiveStatusPulse();
-    extendGatewayAccessWindow(GATEWAY_ACCESS_ACTIVE_WINDOW_MS, "job start");
     publishStatus();
   };
 
@@ -360,7 +284,6 @@ export async function monitorGoChatProvider(
     activeJobs = Math.max(0, activeJobs - 1);
     if (activeJobs === 0) {
       stopActiveStatusPulse();
-      extendGatewayAccessWindow(GATEWAY_ACCESS_ACTIVE_WINDOW_MS, "job finish");
     }
     publishStatus();
   };
@@ -395,7 +318,6 @@ export async function monitorGoChatProvider(
     },
     onError: (error) => {
       setTransientStatus("error", 8_000);
-      extendGatewayAccessWindow(GATEWAY_ACCESS_ERROR_WINDOW_MS, "relay error");
       logger.error(`[gochat:${account.accountId}] relay error: ${error.message}`);
     },
     abortSignal: opts.abortSignal,
@@ -437,7 +359,6 @@ export async function monitorGoChatProvider(
   setRelayStatusReporter((status) => {
     if (status === "error") {
       setTransientStatus("error", 8_000);
-      extendGatewayAccessWindow(GATEWAY_ACCESS_ERROR_WINDOW_MS, "relay status error");
       return;
     }
     if (status === "syncing") {
@@ -459,7 +380,6 @@ export async function monitorGoChatProvider(
     stop: () => {
       clearTransientTimer();
       stopActiveStatusPulse();
-      stopGatewayAccessWatch();
       setRelayStatusReporter(null);
       setRelayWsSender(null);
       stopRelay();

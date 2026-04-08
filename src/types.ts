@@ -36,6 +36,12 @@ export type GoChatGatewayAccessConfig = {
   normalizeLoopbackRemoteUrl?: boolean;
 };
 
+export type GoChatModeSwitchAuthorizationConfig = {
+  targetMode?: GoChatMode;
+  issuedAt?: string;
+  expiresAt?: string;
+};
+
 export const DEFAULT_LOCAL_PORT = 9750;
 export const DEFAULT_LOCAL_HOST = "0.0.0.0";
 export const DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin";
@@ -64,6 +70,7 @@ export type GoChatAccountConfig = {
   trustedAttachmentHosts?: string[];
   localAudioTranscription?: GoChatLocalAudioTranscriptionConfig;
   gatewayAccess?: GoChatGatewayAccessConfig;
+  modeSwitchAuthorization?: GoChatModeSwitchAuthorizationConfig;
   directPort?: number;
   directHost?: string;
   relayPlatformUrl?: string;

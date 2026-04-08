@@ -57,6 +57,25 @@
               }
             }
           },
+          "modeSwitchAuthorization": {
+            "type": "object",
+            "description": "One-time authorization grant consumed by the next explicit local/relay mode switch.",
+            "properties": {
+              "targetMode": {
+                "type": "string",
+                "enum": ["local", "relay"],
+                "description": "Which mode the next authorized switch may enter."
+              },
+              "issuedAt": {
+                "type": "string",
+                "description": "Authorization issuance timestamp."
+              },
+              "expiresAt": {
+                "type": "string",
+                "description": "Authorization expiry timestamp."
+              }
+            }
+          },
           "localAudioTranscription": {
             "type": "object",
             "description": "Optional local audio transcription settings for inbound audio attachments.",

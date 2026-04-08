@@ -48,6 +48,15 @@ const GoChatLocalAudioTranscriptionSchema = z
   .strict()
   .optional();
 
+const GoChatModeSwitchAuthorizationSchema = z
+  .object({
+    targetMode: z.enum(["local", "relay"]).optional(),
+    issuedAt: z.string().optional(),
+    expiresAt: z.string().optional(),
+  })
+  .strict()
+  .optional();
+
 export const GoChatWebhookPayloadSchema = z.object({
   messageId: z.string().min(1),
   conversationId: z.string().min(1),
@@ -77,6 +86,7 @@ export const GoChatAccountSchemaBase = z
     allowPrivateNetwork: z.boolean().optional(),
     trustedAttachmentHosts: z.array(z.string()).optional(),
     localAudioTranscription: GoChatLocalAudioTranscriptionSchema,
+    modeSwitchAuthorization: GoChatModeSwitchAuthorizationSchema,
     directPort: z.number().int().positive().optional(),
     directHost: z.string().optional(),
     relayPlatformUrl: z.string().optional(),
