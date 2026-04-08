@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.20"
+VERSION="2026.4.8-plugin.21"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -70,6 +70,20 @@ warn_if_known_pairing_bug_host() {
     warn "OpenClaw ${parsed} is older than 2026.4.8 and is known to surface local subagent pairing-required failures."
     warn "GoChat ${VERSION} adds runtime auto-repair polling as a mitigation, but upgrading OpenClaw is still recommended."
   fi
+}
+
+openclaw_supports_gateway_access_bootstrap() {
+  if [ -z "${OPENCLAW_BIN}" ]; then
+    return 1
+  fi
+
+  local help_output=""
+  help_output="$("${OPENCLAW_BIN}" gochat --help 2>&1 || true)"
+  if printf '%s\n' "${help_output}" | grep -q "ensure-gateway-access"; then
+    return 0
+  fi
+
+  return 1
 }
 
 # ──────────────────────────────────────────────
@@ -839,8 +853,13 @@ attempt_gateway_access_bootstrap() {
     return 0
   fi
 
+  if ! openclaw_supports_gateway_access_bootstrap; then
+    warn "Local gateway access bootstrap command is not available on this OpenClaw CLI build yet. It will retry from the plugin runtime after gateway startup."
+    return 0
+  fi
+
   info "Bootstrapping local gateway access..."
-  if ! "${OPENCLAW_BIN}" gochat ensure-gateway-access; then
+  if ! "${OPENCLAW_BIN}" gochat ensure-gateway-access >/dev/null 2>&1; then
     warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
   fi
 }

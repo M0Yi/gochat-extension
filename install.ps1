@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.8-plugin.20"
+$VERSION = "2026.4.8-plugin.21"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -76,6 +76,18 @@ function Warn-IfKnownPairingBugHost {
     if ([int64]$key -lt 20260408) {
         Write-Warn "OpenClaw $triplet is older than 2026.4.8 and is known to surface local subagent pairing-required failures."
         Write-Warn "GoChat $VERSION adds runtime auto-repair polling as a mitigation, but upgrading OpenClaw is still recommended."
+    }
+}
+
+function Test-GatewayAccessBootstrapCommand {
+    if (-not $Script:OpenClawBin) {
+        return $false
+    }
+    try {
+        $helpOutput = & $Script:OpenClawBin gochat --help 2>&1 | Out-String
+        return $helpOutput -match "ensure-gateway-access"
+    } catch {
+        return $false
     }
 }
 
@@ -648,9 +660,14 @@ function Invoke-GatewayAccessBootstrap {
         return
     }
 
+    if (-not (Test-GatewayAccessBootstrapCommand)) {
+        Write-Warn "Local gateway access bootstrap command is not available on this OpenClaw CLI build yet. It will retry from the plugin runtime after gateway startup."
+        return
+    }
+
     Write-Info "Bootstrapping local gateway access..."
     try {
-        & $Script:OpenClawBin gochat ensure-gateway-access
+        & $Script:OpenClawBin gochat ensure-gateway-access 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Warn "Local gateway access bootstrap did not complete. It will retry on next gateway startup."
         }

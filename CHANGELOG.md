@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.8-plugin.21] - 2026-04-08
+
+### Fixed
+- Installers now probe `openclaw gochat --help` before calling `ensure-gateway-access`, so older or partially-loaded CLI states no longer print `too many arguments for 'gochat'` during installation
+- Shell and PowerShell installers now suppress bootstrap command parser noise and fall back cleanly to the plugin runtime retry path when the local gateway access command is unavailable
+
 ## [2026.4.8-plugin.20] - 2026-04-08
 
 ### Fixed
