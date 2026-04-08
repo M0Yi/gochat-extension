@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.21"
+VERSION="2026.4.8-plugin.22"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -408,7 +408,7 @@ install_from_tarball() {
 
   if [ -f "${target}/package.json" ]; then
     info "Installing npm dependencies..."
-    (cd "${target}" && npm install --production 2>&1) || {
+    (cd "${target}" && npm install --omit=dev 2>&1) || {
       warn "npm install had warnings (non-fatal)"
     }
   fi
@@ -452,7 +452,7 @@ install_from_source() {
 
   if [ -f "${extensions_dir}/${EXTENSION_NAME}/package.json" ]; then
     info "Installing npm dependencies..."
-    (cd "${extensions_dir}/${EXTENSION_NAME}" && npm install --production 2>&1) || {
+    (cd "${extensions_dir}/${EXTENSION_NAME}" && npm install --omit=dev 2>&1) || {
       warn "npm install had warnings (non-fatal)"
     }
   fi

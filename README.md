@@ -71,7 +71,7 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
        - If install.sh fails → fall back to manual method:
            git clone https://github.com/M0Yi/gochat-extension.git /tmp/gochat-extension
            cp -r /tmp/gochat-extension ~/.openclaw/extensions/gochat
-           cd ~/.openclaw/extensions/gochat && npm install --production
+           cd ~/.openclaw/extensions/gochat && npm install --omit=dev
 
      STEP 3 — Verify installation
        - Run: ls ~/.openclaw/extensions/gochat/package.json
