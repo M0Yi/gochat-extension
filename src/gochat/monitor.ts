@@ -2,7 +2,7 @@ import {
   resolveLoggerBackedRuntime,
   type RuntimeEnv,
 } from "openclaw/plugin-sdk/extension-shared";
-import { resolveGoChatAccount, listGoChatAccountIds } from "../accounts.js";
+import { resolveGoChatAccount } from "../accounts.js";
 import { handleGoChatInbound } from "../inbound.js";
 import { getGoChatRuntime } from "../runtime.js";
 import {
@@ -27,6 +27,13 @@ const ACTIVE_STATUS_REFRESH_MS = 10_000;
 type RuntimeCommandSnapshot = {
   command: string;
   commandArgs: string;
+};
+
+type RuntimeWorkUnitSnapshot = {
+  id: string;
+  label: string;
+  status: string;
+  source: string;
 };
 
 function getPluginVersion(): string {
@@ -156,6 +163,23 @@ function resolveRuntimeModel(cfg: CoreConfig): { currentModel: string; modelSour
   return {
     currentModel: "unknown",
     modelSource: "unknown",
+  };
+}
+
+function buildRuntimeWorkUnitMetadata(activeJobs: number, status: string): Record<string, string> {
+  const count = Math.max(0, Math.floor(activeJobs));
+  const normalizedStatus = String(status || "idle").trim() || "idle";
+  const items: RuntimeWorkUnitSnapshot[] = Array.from({ length: count }, (_, index) => ({
+    id: `job-${index + 1}`,
+    label: `运行任务 ${index + 1}`,
+    status: normalizedStatus,
+    source: "gochat-active-jobs",
+  }));
+  return {
+    runtimeWorkUnitLabel: "运行任务",
+    runtimeWorkUnitSource: "gochat-active-jobs",
+    runtimeWorkUnitCount: String(count),
+    runtimeWorkUnitsJson: JSON.stringify(items),
   };
 }
 
@@ -353,13 +377,13 @@ export async function monitorGoChatProvider(
         cfg: liveConfig,
         accountId: opts.accountId,
       });
-      const accountIds = listGoChatAccountIds(liveConfig);
       const runtimeModel = resolveRuntimeModel(liveConfig);
+      const resolvedStatus = resolveStatus();
       return {
         type: "plugin",
         version: getPluginVersion(),
         agentCount: activeJobs,
-        status: resolveStatus(),
+        status: resolvedStatus,
         uptime: Math.floor((Date.now() - startedAt) / 1000),
         metadata: {
           runtimeSchemaVersion: "1",
@@ -372,9 +396,7 @@ export async function monitorGoChatProvider(
           commandArgs: runtimeCommand.commandArgs,
           currentModel: runtimeModel.currentModel,
           modelSource: runtimeModel.modelSource,
-          runtimeWorkUnitLabel: "运行任务",
-          runtimeWorkUnitSource: "gochat-active-jobs",
-          runtimeWorkUnitCount: String(activeJobs),
+          ...buildRuntimeWorkUnitMetadata(activeJobs, resolvedStatus),
           ...buildSubagentPermissionMetadata(subagentPermissionStatus),
         },
       };

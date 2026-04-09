@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.31] - 2026-04-09
+
+### Changed
+- Relay runtime now publishes a structured `runtimeWorkUnitsJson` snapshot derived from live `activeJobs`, so the demo UI can render each current work unit with its own status badge instead of only showing a single aggregate number
+
 ## [2026.4.9-plugin.30] - 2026-04-09
 
 ### Changed
