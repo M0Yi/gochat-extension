@@ -42,6 +42,23 @@ type OpenClawGatewayHealthResponse = {
   defaultAgentId?: string;
 };
 
+type OpenClawModelsListResponse = {
+  models?: Array<{
+    key?: string;
+    name?: string;
+    input?: string;
+    contextWindow?: number;
+    available?: boolean;
+    tags?: string[];
+    missing?: boolean;
+  }>;
+};
+
+type OpenClawModelsStatusResponse = {
+  defaultModel?: string;
+  resolvedDefault?: string;
+};
+
 type OpenClawSessionSnapshot = {
   sourceMethod: string;
   stateDir: string;
@@ -52,6 +69,20 @@ type OpenClawSessionSnapshot = {
   defaultContextTokens?: number;
   count: number;
   sessions: Array<Record<string, string | number | boolean>>;
+};
+
+type OpenClawModelsSnapshot = {
+  currentModel?: string;
+  modelSource: string;
+  models: Array<{
+    key: string;
+    name?: string;
+    input?: string;
+    contextWindow?: number;
+    available: boolean;
+    tags?: string[];
+    current?: boolean;
+  }>;
 };
 
 type CachedSnapshot = {
@@ -187,11 +218,75 @@ async function buildOpenClawRuntimeMetadata(): Promise<Record<string, string>> {
   const list = payload as OpenClawGatewaySessionsListResponse;
   const defaultAgentId = await loadDefaultAgentId();
   const snapshot = normalizeSessionSnapshot(list, defaultAgentId);
+  const modelsSnapshot = await loadOpenClawModelsSnapshot();
   return {
     openclawSessionsSource: snapshot.sourceMethod,
     openclawSessionsCount: String(snapshot.count),
     openclawSessionsJson: JSON.stringify(snapshot),
+    openclawModelsJson: JSON.stringify(modelsSnapshot),
   };
+}
+
+async function loadOpenClawModelsSnapshot(): Promise<OpenClawModelsSnapshot> {
+  const [statusPayload, listPayload] = await Promise.all([
+    runOpenClawJson(["models", "status", "--json"]),
+    runOpenClawJson(["models", "list", "--all", "--json"]),
+  ]);
+
+  const status = statusPayload as OpenClawModelsStatusResponse;
+  const list = listPayload as OpenClawModelsListResponse;
+  const currentModel = String(status.resolvedDefault ?? status.defaultModel ?? "").trim();
+  const models = (Array.isArray(list.models) ? list.models : [])
+    .filter((model) => model?.available !== false && model?.missing !== true)
+    .map((model) => {
+      const key = String(model?.key ?? "").trim();
+      return {
+        key,
+        name: String(model?.name ?? "").trim() || undefined,
+        input: String(model?.input ?? "").trim() || undefined,
+        contextWindow: Number.isFinite(model?.contextWindow) ? Number(model?.contextWindow) : undefined,
+        available: true,
+        tags: Array.isArray(model?.tags)
+          ? model.tags.map((tag) => String(tag ?? "").trim()).filter(Boolean)
+          : undefined,
+        current: !!key && key === currentModel,
+      };
+    })
+    .filter((model) => !!model.key)
+    .sort((a, b) => {
+      if (!!a.current !== !!b.current) {
+        return a.current ? -1 : 1;
+      }
+      return a.key.localeCompare(b.key);
+    });
+
+  if (currentModel && !models.some((model) => model.key === currentModel)) {
+    models.unshift({
+      key: currentModel,
+      name: currentModel,
+      available: true,
+      tags: ["current"],
+      current: true,
+    });
+  }
+
+  return {
+    currentModel: currentModel || undefined,
+    modelSource: "plugin",
+    models,
+  };
+}
+
+export async function setOpenClawCurrentModel(model: string): Promise<void> {
+  const nextModel = String(model ?? "").trim();
+  if (!nextModel) {
+    throw new Error("model is required");
+  }
+  await execFileAsync(resolveOpenClawBin(), ["models", "set", nextModel], {
+    timeout: 15_000,
+    maxBuffer: 2 * 1024 * 1024,
+  });
+  cachedSnapshot = null;
 }
 
 export async function loadOpenClawRuntimeSnapshotMetadata(params?: {

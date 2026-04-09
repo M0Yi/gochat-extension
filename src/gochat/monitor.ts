@@ -10,7 +10,10 @@ import {
   inspectSubagentPermissionStatus,
   type SubagentPermissionStatus,
 } from "../subagent-permission-status.js";
-import { loadOpenClawRuntimeSnapshotMetadata } from "../openclaw-runtime-snapshot.js";
+import {
+  loadOpenClawRuntimeSnapshotMetadata,
+  setOpenClawCurrentModel,
+} from "../openclaw-runtime-snapshot.js";
 import { createRelayWSConnection } from "./relay-ws.js";
 import { setRelayStatusReporter, setRelayWsSender } from "../send.js";
 import type {
@@ -392,6 +395,15 @@ export async function monitorGoChatProvider(
     onControlMessage: async (message) => {
       if (message?.type === "runtime.refresh") {
         await refreshSubagentPermissionStatus(true);
+        await refreshOpenClawRuntimeMetadata(true);
+        return;
+      }
+      if (message?.type === "openclaw.model.set") {
+        const nextModel = String(message.model ?? "").trim();
+        if (!nextModel) {
+          return;
+        }
+        await setOpenClawCurrentModel(nextModel);
         await refreshOpenClawRuntimeMetadata(true);
       }
     },

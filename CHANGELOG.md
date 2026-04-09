@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026.4.9-plugin.32] - 2026-04-09
 
+## [2026.4.9-plugin.33] - 2026-04-09
+
+### Changed
+- Model list and model switch control now run on the connected GoChat plugin machine, so `/models`, `/model`, and admin-side model changes no longer depend on the Go server host's local OpenClaw installation
+- Plugin runtime refresh now also carries `openclawModelsJson`, allowing the Go backend to render and mutate model state entirely from plugin-reported metadata
+
+## [2026.4.9-plugin.32] - 2026-04-09
+
 ### Fixed
 - `/app` runtime session data now comes from the connected GoChat plugin machine instead of the Go server host, so OpenClaw Sessions in the demo UI follow the remote plugin's `sessions.list` result rather than the backend machine's local state
 - Relay runtime refresh requests now trigger an immediate plugin-side OpenClaw session snapshot refresh before the next status push, helping `/app` converge on the connected device's latest Sessions view faster
