@@ -1,6 +1,6 @@
 {
   "name": "@m0yi/gochat",
-  "version": "2026.4.9-plugin.27",
+  "version": "2026.4.9-plugin.28",
   "description": "OpenClaw GoChat channel plugin - WebSocket relay to GoChat platform (default) or local HTTP server",
   "type": "module",
   "dependencies": {

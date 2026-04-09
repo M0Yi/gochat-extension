@@ -33,6 +33,8 @@ export type SubagentPermissionStatus =
       state: "ready";
       summary: string;
       detailSignature: string;
+      approvalState: "approved";
+      approvalLabel: string;
       scopes: string[];
       deviceId?: string;
     }
@@ -40,6 +42,8 @@ export type SubagentPermissionStatus =
       state: "pending_approval";
       summary: string;
       detailSignature: string;
+      approvalState: "pending";
+      approvalLabel: string;
       approvalCommand: string;
       requestId?: string;
       deviceId?: string;
@@ -48,6 +52,8 @@ export type SubagentPermissionStatus =
       state: "degraded";
       summary: string;
       detailSignature: string;
+      approvalState: "limited";
+      approvalLabel: string;
       scopes: string[];
       deviceId?: string;
     }
@@ -55,6 +61,8 @@ export type SubagentPermissionStatus =
       state: "unknown";
       summary: string;
       detailSignature: string;
+      approvalState: "unknown";
+      approvalLabel: string;
     };
 
 let cachedStatus:
@@ -165,6 +173,8 @@ function inspectFromDeviceList(deviceList: DeviceListResponse): SubagentPermissi
       state: "pending_approval",
       summary: "Subagent permission needs approval.",
       detailSignature: `pending:${pending.requestId ?? "latest"}:${pending.deviceId ?? ""}`,
+      approvalState: "pending",
+      approvalLabel: "pending request",
       approvalCommand,
       requestId: pending.requestId?.trim() || undefined,
       deviceId: pending.deviceId?.trim() || undefined,
@@ -177,6 +187,8 @@ function inspectFromDeviceList(deviceList: DeviceListResponse): SubagentPermissi
       state: "unknown",
       summary: "Subagent permission status is unavailable.",
       detailSignature: "unknown:no-cli-device",
+      approvalState: "unknown",
+      approvalLabel: "unknown",
     };
   }
 
@@ -186,6 +198,8 @@ function inspectFromDeviceList(deviceList: DeviceListResponse): SubagentPermissi
       state: "ready",
       summary: "Subagent permission is ready.",
       detailSignature: `ready:${paired.deviceId ?? ""}:${scopes.join(",")}`,
+      approvalState: "approved",
+      approvalLabel: "approved",
       scopes,
       deviceId: paired.deviceId?.trim() || undefined,
     };
@@ -195,6 +209,8 @@ function inspectFromDeviceList(deviceList: DeviceListResponse): SubagentPermissi
     state: "degraded",
     summary: "Subagent permission is limited.",
     detailSignature: `degraded:${paired.deviceId ?? ""}:${scopes.join(",")}`,
+    approvalState: "limited",
+    approvalLabel: "paired without operator.admin",
     scopes,
     deviceId: paired.deviceId?.trim() || undefined,
   };
@@ -216,6 +232,8 @@ export async function inspectSubagentPermissionStatus(params?: {
       state: "unknown",
       summary: "Subagent permission status is unavailable.",
       detailSignature: `unknown:${error instanceof Error ? error.message : String(error)}`,
+      approvalState: "unknown",
+      approvalLabel: "unknown",
     };
   }
 
@@ -233,6 +251,10 @@ export function buildSubagentPermissionStatusMessage(
     return [
       "Subagent permission: ready",
       "",
+      `Device approval: ${status.approvalLabel}`,
+      "",
+      `Scopes: ${status.scopes.join(", ") || "(none)"}`,
+      "",
       "Current local gateway device already includes `operator.admin`.",
     ].join("\n");
   }
@@ -244,6 +266,8 @@ export function buildSubagentPermissionStatusMessage(
     });
     return [
       "Subagent permission: action required",
+      "",
+      `Device approval: ${status.approvalLabel}`,
       "",
       "A local gateway repair request is waiting for `operator.admin` approval.",
       "",
@@ -265,6 +289,8 @@ export function buildSubagentPermissionStatusMessage(
     return [
       "Subagent permission: limited",
       "",
+      `Device approval: ${status.approvalLabel}`,
+      "",
       `Current local gateway device scopes: ${status.scopes.join(", ") || "(none)"}`,
       "",
       "Trigger the subagent action again if needed, then recover with:",
@@ -278,6 +304,34 @@ export function buildSubagentPermissionStatusMessage(
   return [
     "Subagent permission: unknown",
     "",
+    `Device approval: ${status.approvalLabel}`,
+    "",
     "The plugin could not inspect local gateway pairing status right now.",
   ].join("\n");
+}
+
+export function buildSubagentPermissionMetadata(
+  status: SubagentPermissionStatus,
+): Record<string, string> {
+  const metadata: Record<string, string> = {
+    subagentPermissionState: status.state,
+    subagentPermissionSummary: status.summary,
+    subagentDeviceApprovalState: status.approvalState,
+    subagentDeviceApprovalLabel: status.approvalLabel,
+  };
+
+  if ("deviceId" in status && status.deviceId) {
+    metadata.subagentDeviceId = status.deviceId;
+  }
+  if ("requestId" in status && status.requestId) {
+    metadata.subagentRepairRequestId = status.requestId;
+  }
+  if ("approvalCommand" in status && status.approvalCommand) {
+    metadata.subagentApprovalCommand = status.approvalCommand;
+  }
+  if ("scopes" in status && status.scopes?.length) {
+    metadata.subagentScopes = status.scopes.join(", ");
+  }
+
+  return metadata;
 }

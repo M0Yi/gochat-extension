@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.28] - 2026-04-09
+
+### Changed
+- GoChat permission status messages now include an explicit `Device approval` line so users can see whether the local repair request is approved, pending, limited, or unknown without inferring it from the rest of the text
+- Relay runtime status metadata now includes the current subagent device approval state, allowing the demo `/app` header to show the same approval state live alongside model and command details
+
 ## [2026.4.9-plugin.27] - 2026-04-09
 
 ### Added

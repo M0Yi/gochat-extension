@@ -5,6 +5,11 @@ import {
 import { resolveGoChatAccount, listGoChatAccountIds } from "../accounts.js";
 import { handleGoChatInbound } from "../inbound.js";
 import { getGoChatRuntime } from "../runtime.js";
+import {
+  buildSubagentPermissionMetadata,
+  inspectSubagentPermissionStatus,
+  type SubagentPermissionStatus,
+} from "../subagent-permission-status.js";
 import { createRelayWSConnection } from "./relay-ws.js";
 import { setRelayStatusReporter, setRelayWsSender } from "../send.js";
 import type {
@@ -199,6 +204,14 @@ export async function monitorGoChatProvider(
   let transientUntil = 0;
   let transientTimer: ReturnType<typeof setTimeout> | null = null;
   let activeStatusTimer: ReturnType<typeof setInterval> | null = null;
+  let permissionPollTimer: ReturnType<typeof setInterval> | null = null;
+  let subagentPermissionStatus: SubagentPermissionStatus = {
+    state: "unknown",
+    summary: "Subagent permission status is unavailable.",
+    detailSignature: "unknown:initial",
+    approvalState: "unknown",
+    approvalLabel: "unknown",
+  };
 
   const clearTransientTimer = (): void => {
     if (transientTimer) {
@@ -288,6 +301,19 @@ export async function monitorGoChatProvider(
     publishStatus();
   };
 
+  const refreshSubagentPermissionStatus = async (forceRefresh = false): Promise<void> => {
+    try {
+      const nextStatus = await inspectSubagentPermissionStatus({ forceRefresh });
+      if (nextStatus.detailSignature === subagentPermissionStatus.detailSignature) {
+        return;
+      }
+      subagentPermissionStatus = nextStatus;
+      pushRelayStatusNow();
+    } catch {
+      // keep last known metadata
+    }
+  };
+
   const { start: startRelay, stop: stopRelay, send: sendRelay, sendStatusNow } = createRelayWSConnection({
     platformUrl: account.relayPlatformUrl,
     channelId: account.channelId,
@@ -346,6 +372,7 @@ export async function monitorGoChatProvider(
           commandArgs: runtimeCommand.commandArgs,
           currentModel: runtimeModel.currentModel,
           modelSource: runtimeModel.modelSource,
+          ...buildSubagentPermissionMetadata(subagentPermissionStatus),
         },
       };
     },
@@ -372,12 +399,20 @@ export async function monitorGoChatProvider(
   });
   setRelayWsSender(sendRelay);
   await startRelay();
+  void refreshSubagentPermissionStatus(true);
+  permissionPollTimer = setInterval(() => {
+    void refreshSubagentPermissionStatus(true);
+  }, 10_000);
   logger.info(
     `[gochat:${account.accountId}] relay connected to ${account.relayPlatformUrl}`,
   );
 
   return {
     stop: () => {
+      if (permissionPollTimer) {
+        clearInterval(permissionPollTimer);
+        permissionPollTimer = null;
+      }
       clearTransientTimer();
       stopActiveStatusPulse();
       setRelayStatusReporter(null);
