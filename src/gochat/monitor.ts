@@ -358,7 +358,7 @@ export async function monitorGoChatProvider(
       return {
         type: "plugin",
         version: getPluginVersion(),
-        agentCount: accountIds.length,
+        agentCount: activeJobs,
         status: resolveStatus(),
         uptime: Math.floor((Date.now() - startedAt) / 1000),
         metadata: {
@@ -372,6 +372,9 @@ export async function monitorGoChatProvider(
           commandArgs: runtimeCommand.commandArgs,
           currentModel: runtimeModel.currentModel,
           modelSource: runtimeModel.modelSource,
+          runtimeWorkUnitLabel: "运行任务",
+          runtimeWorkUnitSource: "gochat-active-jobs",
+          runtimeWorkUnitCount: String(activeJobs),
           ...buildSubagentPermissionMetadata(subagentPermissionStatus),
         },
       };
