@@ -50,6 +50,11 @@ export type GoChatGatewayAccessResult = {
   skippedReason?: string;
 };
 
+export type GoChatLocalRepairApprovalResult = Pick<
+  GoChatGatewayAccessResult,
+  "approvedRequestId" | "approvedDeviceId" | "skippedReason"
+>;
+
 let bootstrapPromise: Promise<GoChatGatewayAccessResult> | null = null;
 
 function logInfo(logger: GatewayAccessLogger | undefined, message: string): void {
@@ -203,7 +208,7 @@ async function maybePersistNormalizedGatewayUrl(params: {
 
 async function maybeApproveLocalRepair(params: {
   logger?: GatewayAccessLogger;
-}): Promise<Pick<GoChatGatewayAccessResult, "approvedRequestId" | "approvedDeviceId" | "skippedReason">> {
+}): Promise<GoChatLocalRepairApprovalResult> {
   let deviceList: DeviceListResponse;
   try {
     deviceList = (await runOpenClawJson(["devices", "list", "--json", "--timeout", "5000"])) as DeviceListResponse;
@@ -252,6 +257,14 @@ async function maybeApproveLocalRepair(params: {
       skippedReason: `approve failed: ${stringifyError(error)}`,
     };
   }
+}
+
+export async function approveGoChatLocalRepair(params?: {
+  logger?: GatewayAccessLogger;
+}): Promise<GoChatLocalRepairApprovalResult> {
+  return await maybeApproveLocalRepair({
+    logger: params?.logger,
+  });
 }
 
 export async function ensureGoChatGatewayAccess(params?: {

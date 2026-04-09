@@ -147,6 +147,10 @@ async function loadDeviceList(): Promise<DeviceListResponse> {
 }
 
 function buildApprovalCommand(request: PendingDeviceRequest | null): string {
+  return "openclaw gochat approve-local-repair";
+}
+
+function buildDirectApprovalFallbackCommand(request: PendingDeviceRequest | null): string {
   if (request?.requestId?.trim()) {
     return `openclaw devices approve ${request.requestId.trim()}`;
   }
@@ -234,6 +238,10 @@ export function buildSubagentPermissionStatusMessage(
   }
 
   if (status.state === "pending_approval") {
+    const fallbackCommand = buildDirectApprovalFallbackCommand({
+      requestId: status.requestId,
+      deviceId: status.deviceId,
+    });
     return [
       "Subagent permission: action required",
       "",
@@ -241,6 +249,12 @@ export function buildSubagentPermissionStatusMessage(
       "",
       "```bash",
       status.approvalCommand,
+      "```",
+      "",
+      "Fallback direct command:",
+      "",
+      "```bash",
+      fallbackCommand,
       "```",
       "",
       "Run the command, then resend your last message.",
@@ -253,10 +267,10 @@ export function buildSubagentPermissionStatusMessage(
       "",
       `Current local gateway device scopes: ${status.scopes.join(", ") || "(none)"}`,
       "",
-      "Trigger the subagent action again if needed, then approve the new repair request with:",
+      "Trigger the subagent action again if needed, then recover with:",
       "",
       "```bash",
-      "openclaw devices approve --latest",
+      "openclaw gochat approve-local-repair",
       "```",
     ].join("\n");
   }

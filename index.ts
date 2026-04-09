@@ -5,7 +5,7 @@ import { createGoChatTaskTool } from "./src/task-tools.js";
 import { resolveGoChatAccount } from "./src/accounts.js";
 import type { CoreConfig } from "./src/types.js";
 import { DEFAULT_MODE_SWITCH_AUTH_TTL_MINUTES, grantGoChatModeSwitchAuthorization } from "./src/mode-switch-authorization.js";
-import { ensureGoChatGatewayAccess } from "./src/gateway-access.js";
+import { approveGoChatLocalRepair, ensureGoChatGatewayAccess } from "./src/gateway-access.js";
 import { loadConfig, writeConfigFile } from "openclaw/plugin-sdk/config-runtime";
 
 export { gochatPlugin } from "./src/channel.js";
@@ -140,6 +140,41 @@ export default defineChannelPluginEntry({
           });
 
         gochatCmd
+          .command("approve-local-repair")
+          .description("Approve the pending safe local CLI repair request used by GoChat subagent actions")
+          .option("--json", "Output JSON result")
+          .action(async (options) => {
+            try {
+              const result = await approveGoChatLocalRepair({
+                logger: {
+                  info: (message) => console.error(message),
+                  warn: (message) => console.error(message),
+                  error: (message) => console.error(message),
+                },
+              });
+
+              if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+                return;
+              }
+
+              if (result.approvedRequestId) {
+                console.log(
+                  `Approved local repair request: ${result.approvedRequestId}${result.approvedDeviceId ? ` (device ${result.approvedDeviceId})` : ""}`,
+                );
+                return;
+              }
+
+              console.log(result.skippedReason || "No eligible local repair request is pending.");
+            } catch (error) {
+              console.error("\n✗ Failed to approve local repair request:");
+              console.error(`  ${error instanceof Error ? error.message : String(error)}`);
+              console.error("");
+              process.exit(1);
+            }
+          });
+
+        gochatCmd
           .command("ensure-gateway-access")
           .description("Manually normalize local gateway routing and approve safe local CLI repair requests")
           .option("--json", "Output JSON result")
@@ -191,6 +226,11 @@ export default defineChannelPluginEntry({
           {
             name: "gochat authorize-mode-switch",
             description: "Authorize the next GoChat mode switch",
+            hasSubcommands: false,
+          },
+          {
+            name: "gochat approve-local-repair",
+            description: "Approve the pending safe local CLI repair request used by GoChat subagent actions",
             hasSubcommands: false,
           },
           {

@@ -272,11 +272,11 @@ openclaw channels list
 # GoChat now proactively pushes "Subagent permission: ready/action required"
 # status messages into the chat when the local gateway pairing state changes
 
-# If an older local OpenClaw build needs manual gateway repair help
-openclaw gochat ensure-gateway-access
+# If a live GoChat session reports "Subagent permission: action required"
+openclaw gochat approve-local-repair
 
-# If a live GoChat session replies with a gateway pairing-required message
-openclaw devices approve --latest
+# If an older local OpenClaw build also needs loopback gateway normalization
+openclaw gochat ensure-gateway-access
 ```
 
 ### Sending Messages
