@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.29] - 2026-04-09
+
+### Fixed
+- `openclaw gochat approve-local-repair` now treats `operator.talk.secrets` as part of the standard safe local CLI operator scope-upgrade set, so current OpenClaw repair requests that include talk secret access can still be matched and approved
+
 ## [2026.4.9-plugin.28] - 2026-04-09
 
 ### Changed

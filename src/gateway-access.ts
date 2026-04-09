@@ -9,6 +9,7 @@ const REQUIRED_OPERATOR_SCOPES = [
   "operator.approvals",
   "operator.pairing",
   "operator.read",
+  "operator.talk.secrets",
   "operator.write",
 ] as const;
 
