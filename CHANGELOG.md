@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.26] - 2026-04-09
+
+### Fixed
+- Shell installer now marks `gochat` as trusted even when managed `openclaw plugins install` falls back to direct file extraction, so `plugins.allow is empty` and `untracked local code` warnings do not appear after fallback installs
+- PowerShell installer now writes the same `plugins.allow` trust entry after Windows installs, matching the shell installer trust behavior
+
 ## [2026.4.8-plugin.25] - 2026-04-08
 
 ### Added

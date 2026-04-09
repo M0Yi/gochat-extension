@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.8-plugin.25"
+$VERSION = "2026.4.9-plugin.26"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
@@ -346,6 +346,7 @@ function Install-FromSource {
         Pop-Location
     }
 
+    Ensure-PluginTrusted
     Write-Ok "Installed to $target"
     Install-BundledSkills $target
 }
@@ -394,6 +395,7 @@ function Install-FromTarball {
         Remove-DirIfExists $extractDir
     }
 
+    Ensure-PluginTrusted
     Write-Ok "Installed to $target"
     Install-BundledSkills $target
 }
@@ -463,6 +465,25 @@ function Ensure-ConfigFile {
     if (-not (Test-Path $ConfigFile)) {
         Set-Content -Path $ConfigFile -Value "{`n}`n"
     }
+}
+
+function Ensure-PluginTrusted {
+    $configFile = Join-Path (Get-OpenClawDir) "openclaw.json"
+    Ensure-ConfigFile $configFile
+
+    & node -e @"
+const fs = require('fs');
+const file = process.argv[1];
+const pluginId = process.argv[2];
+let cfg = {};
+try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) cfg = {};
+if (!cfg.plugins || typeof cfg.plugins !== 'object' || Array.isArray(cfg.plugins)) cfg.plugins = {};
+const allow = Array.isArray(cfg.plugins.allow) ? cfg.plugins.allow.slice() : [];
+if (!allow.includes(pluginId)) allow.push(pluginId);
+cfg.plugins.allow = allow;
+fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
+"@ $configFile $EXTENSION_NAME 2>$null | Out-Null
 }
 
 function Get-GoChatConfigSnapshot {

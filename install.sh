@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.8-plugin.25"
+VERSION="2026.4.9-plugin.26"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -475,6 +475,7 @@ install_from_tarball() {
     }
   fi
 
+  ensure_plugin_trusted
   ok "Installed to ${target}"
   install_bundled_skills "${target}"
 }
@@ -519,6 +520,7 @@ install_from_source() {
     }
   fi
 
+  ensure_plugin_trusted
   ok "Installed to ${extensions_dir}/${EXTENSION_NAME}"
   install_bundled_skills "${extensions_dir}/${EXTENSION_NAME}"
 }
