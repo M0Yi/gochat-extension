@@ -10,6 +10,7 @@ import {
   inspectSubagentPermissionStatus,
   type SubagentPermissionStatus,
 } from "../subagent-permission-status.js";
+import { loadOpenClawRuntimeSnapshotMetadata } from "../openclaw-runtime-snapshot.js";
 import { createRelayWSConnection } from "./relay-ws.js";
 import { setRelayStatusReporter, setRelayWsSender } from "../send.js";
 import type {
@@ -23,6 +24,7 @@ import { fileURLToPath } from "node:url";
 
 let _pluginVersion: string | null = null;
 const ACTIVE_STATUS_REFRESH_MS = 10_000;
+const OPENCLAW_RUNTIME_REFRESH_MS = 20_000;
 
 type RuntimeCommandSnapshot = {
   command: string;
@@ -229,6 +231,7 @@ export async function monitorGoChatProvider(
   let transientTimer: ReturnType<typeof setTimeout> | null = null;
   let activeStatusTimer: ReturnType<typeof setInterval> | null = null;
   let permissionPollTimer: ReturnType<typeof setInterval> | null = null;
+  let openclawRuntimePollTimer: ReturnType<typeof setInterval> | null = null;
   let subagentPermissionStatus: SubagentPermissionStatus = {
     state: "unknown",
     summary: "Subagent permission status is unavailable.",
@@ -236,6 +239,7 @@ export async function monitorGoChatProvider(
     approvalState: "unknown",
     approvalLabel: "unknown",
   };
+  let openclawRuntimeMetadata: Record<string, string> = {};
 
   const clearTransientTimer = (): void => {
     if (transientTimer) {
@@ -338,6 +342,21 @@ export async function monitorGoChatProvider(
     }
   };
 
+  const refreshOpenClawRuntimeMetadata = async (forceRefresh = false): Promise<void> => {
+    try {
+      const nextMetadata = await loadOpenClawRuntimeSnapshotMetadata({ forceRefresh });
+      const currentSignature = JSON.stringify(openclawRuntimeMetadata);
+      const nextSignature = JSON.stringify(nextMetadata);
+      if (currentSignature === nextSignature) {
+        return;
+      }
+      openclawRuntimeMetadata = nextMetadata;
+      pushRelayStatusNow();
+    } catch {
+      // keep last known snapshot metadata
+    }
+  };
+
   const { start: startRelay, stop: stopRelay, send: sendRelay, sendStatusNow } = createRelayWSConnection({
     platformUrl: account.relayPlatformUrl,
     channelId: account.channelId,
@@ -370,6 +389,12 @@ export async function monitorGoChatProvider(
       setTransientStatus("error", 8_000);
       logger.error(`[gochat:${account.accountId}] relay error: ${error.message}`);
     },
+    onControlMessage: async (message) => {
+      if (message?.type === "runtime.refresh") {
+        await refreshSubagentPermissionStatus(true);
+        await refreshOpenClawRuntimeMetadata(true);
+      }
+    },
     abortSignal: opts.abortSignal,
     statusProvider: () => {
       const liveConfig = resolveLiveConfig();
@@ -398,6 +423,7 @@ export async function monitorGoChatProvider(
           modelSource: runtimeModel.modelSource,
           ...buildRuntimeWorkUnitMetadata(activeJobs, resolvedStatus),
           ...buildSubagentPermissionMetadata(subagentPermissionStatus),
+          ...openclawRuntimeMetadata,
         },
       };
     },
@@ -425,9 +451,13 @@ export async function monitorGoChatProvider(
   setRelayWsSender(sendRelay);
   await startRelay();
   void refreshSubagentPermissionStatus(true);
+  void refreshOpenClawRuntimeMetadata(true);
   permissionPollTimer = setInterval(() => {
     void refreshSubagentPermissionStatus(true);
   }, 10_000);
+  openclawRuntimePollTimer = setInterval(() => {
+    void refreshOpenClawRuntimeMetadata(true);
+  }, OPENCLAW_RUNTIME_REFRESH_MS);
   logger.info(
     `[gochat:${account.accountId}] relay connected to ${account.relayPlatformUrl}`,
   );
@@ -437,6 +467,10 @@ export async function monitorGoChatProvider(
       if (permissionPollTimer) {
         clearInterval(permissionPollTimer);
         permissionPollTimer = null;
+      }
+      if (openclawRuntimePollTimer) {
+        clearInterval(openclawRuntimePollTimer);
+        openclawRuntimePollTimer = null;
       }
       clearTransientTimer();
       stopActiveStatusPulse();

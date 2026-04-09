@@ -16,6 +16,7 @@ export interface RelayWSOptions {
   channelId: string;
   secret: string;
   onMessage: (message: any) => void | Promise<void>;
+  onControlMessage?: (message: any) => void | Promise<void>;
   onError?: (error: Error) => void;
   abortSignal?: AbortSignal;
   statusProvider?: () => RelayStatusPayload | null;
@@ -38,7 +39,7 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
   sendStatusNow: () => void;
   stop: () => void;
 } {
-  const { platformUrl, channelId, secret, onMessage, onError, abortSignal, statusProvider } = opts;
+  const { platformUrl, channelId, secret, onMessage, onControlMessage, onError, abortSignal, statusProvider } = opts;
 
   let ws: WSInstance | null = null;
   let stopped = false;
@@ -144,7 +145,7 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
         resolve();
       });
 
-      socket.on("message", (raw: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
+      socket.on("message", async (raw: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
         try {
           const text = typeof raw === "string"
             ? raw
@@ -166,6 +167,13 @@ export function createRelayWSConnection(opts: RelayWSOptions): {
               });
           } else if (parsed.type === "runtime.refresh") {
             log("info", `recv runtime refresh request: reason=${parsed.reason || "manual"}`);
+            if (onControlMessage) {
+              try {
+                await Promise.resolve(onControlMessage(parsed));
+              } catch (err) {
+                onError?.(err instanceof Error ? err : new Error(String(err)));
+              }
+            }
             sendStatusNow();
           } else if (parsed.type === "reply") {
             log("info", `recv reply: conv=${parsed.conversationId || "default"} text="${(parsed.text || "").substring(0, 60)}..."`);
