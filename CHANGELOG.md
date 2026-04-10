@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2026.4.9-plugin.32] - 2026-04-09
+## [2026.4.9-plugin.34] - 2026-04-10
+
+### Fixed
+- Plugin-side model snapshots now use `openclaw models list --json` instead of `openclaw models list --all --json`, so GoChat only shows the remote device's actually configured/selectable models rather than every globally visible provider model
 
 ## [2026.4.9-plugin.33] - 2026-04-09
 

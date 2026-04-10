@@ -230,7 +230,10 @@ async function buildOpenClawRuntimeMetadata(): Promise<Record<string, string>> {
 async function loadOpenClawModelsSnapshot(): Promise<OpenClawModelsSnapshot> {
   const [statusPayload, listPayload] = await Promise.all([
     runOpenClawJson(["models", "status", "--json"]),
-    runOpenClawJson(["models", "list", "--all", "--json"]),
+    // Use the default list so GoChat only shows models the remote OpenClaw
+    // installation currently exposes for user selection, not every possible
+    // provider model visible via --all.
+    runOpenClawJson(["models", "list", "--json"]),
   ]);
 
   const status = statusPayload as OpenClawModelsStatusResponse;
