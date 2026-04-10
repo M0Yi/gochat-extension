@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.38] - 2026-04-10
+
+### Added
+- Plugin logs now include explicit OpenClaw command start/success/failure lines for runtime snapshot and model-switch commands, including duration and formatted error details, so remote relay diagnostics show what GoChat actually asked OpenClaw to execute
+
 ## [2026.4.9-plugin.37] - 2026-04-10
 
 ### Fixed

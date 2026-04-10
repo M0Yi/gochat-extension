@@ -12,6 +12,7 @@ import {
 } from "../subagent-permission-status.js";
 import {
   loadOpenClawRuntimeSnapshotMetadata,
+  setOpenClawRuntimeSnapshotLogger,
   setOpenClawCurrentModel,
 } from "../openclaw-runtime-snapshot.js";
 import { createRelayWSConnection } from "./relay-ws.js";
@@ -217,6 +218,13 @@ export async function monitorGoChatProvider(
     channel: "gochat",
     accountId: account.accountId,
   });
+  setOpenClawRuntimeSnapshotLogger((level, message) => {
+    if (level === "warn") {
+      logger.warn(message);
+      return;
+    }
+    logger.info(message);
+  });
   const runtimeCommand = resolveRuntimeCommandSnapshot();
 
   const resolveLiveConfig = (): CoreConfig => {
@@ -237,6 +245,7 @@ export async function monitorGoChatProvider(
   let openclawRuntimePollTimer: ReturnType<typeof setInterval> | null = null;
   let subagentPermissionRefreshInFlight: Promise<void> | null = null;
   let openclawRuntimeRefreshInFlight: Promise<void> | null = null;
+  let modelSwitchMetadata: Record<string, string> = {};
   let subagentPermissionStatus: SubagentPermissionStatus = {
     state: "unknown",
     summary: "Subagent permission status is unavailable.",
@@ -437,8 +446,32 @@ export async function monitorGoChatProvider(
         if (!nextModel) {
           return;
         }
-        await setOpenClawCurrentModel(nextModel);
-        await refreshOpenClawRuntimeMetadata(true);
+        logger.info(`[gochat:${account.accountId}] recv model switch request: model=${nextModel}`);
+        modelSwitchMetadata = {
+          openclawModelSetTarget: nextModel,
+          openclawModelSetStatus: "pending",
+          openclawModelSetError: "",
+        };
+        pushRelayStatusNow();
+        try {
+          await setOpenClawCurrentModel(nextModel);
+          await refreshOpenClawRuntimeMetadata(true);
+          logger.info(`[gochat:${account.accountId}] openclaw model switch success: model=${nextModel}`);
+          modelSwitchMetadata = {
+            openclawModelSetTarget: nextModel,
+            openclawModelSetStatus: "success",
+            openclawModelSetError: "",
+          };
+        } catch (error) {
+          const messageText = error instanceof Error ? error.message : String(error);
+          logger.warn(`[gochat:${account.accountId}] openclaw model set failed: model=${nextModel} error=${messageText}`);
+          modelSwitchMetadata = {
+            openclawModelSetTarget: nextModel,
+            openclawModelSetStatus: "failed",
+            openclawModelSetError: messageText,
+          };
+        }
+        pushRelayStatusNow();
       }
     },
     abortSignal: opts.abortSignal,
@@ -470,6 +503,7 @@ export async function monitorGoChatProvider(
           ...buildRuntimeWorkUnitMetadata(activeJobs, resolvedStatus),
           ...buildSubagentPermissionMetadata(subagentPermissionStatus),
           ...openclawRuntimeMetadata,
+          ...modelSwitchMetadata,
         },
       };
     },
@@ -520,6 +554,7 @@ export async function monitorGoChatProvider(
       }
       clearTransientTimer();
       stopActiveStatusPulse();
+      setOpenClawRuntimeSnapshotLogger(null);
       setRelayStatusReporter(null);
       setRelayWsSender(null);
       stopRelay();

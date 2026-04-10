@@ -91,7 +91,23 @@ type CachedSnapshot = {
   metadata: Record<string, string>;
 };
 
+type RuntimeLogLevel = "info" | "warn";
+type RuntimeLogger = ((level: RuntimeLogLevel, message: string) => void) | null;
+
 let cachedSnapshot: CachedSnapshot | null = null;
+let runtimeLogger: RuntimeLogger = null;
+
+function emitRuntimeLog(level: RuntimeLogLevel, message: string): void {
+  runtimeLogger?.(level, message);
+}
+
+function formatCommand(args: string[]): string {
+  return [resolveOpenClawBin(), ...args].join(" ");
+}
+
+export function setOpenClawRuntimeSnapshotLogger(logger: RuntimeLogger): void {
+  runtimeLogger = logger;
+}
 
 function extractJsonPayload(raw: string): unknown {
   const text = raw.trim();
@@ -140,11 +156,51 @@ function resolveStateDir(): string {
 }
 
 async function runOpenClawJson(args: string[]): Promise<unknown> {
-  const { stdout, stderr } = await execFileAsync(resolveOpenClawBin(), args, {
-    timeout: OPENCLAW_COMMAND_TIMEOUT_MS,
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  return extractJsonPayload([stdout, stderr].filter(Boolean).join("\n"));
+  const command = formatCommand(args);
+  const startedAt = Date.now();
+  emitRuntimeLog("info", `[gochat:runtime] openclaw exec start: ${command}`);
+  try {
+    const { stdout, stderr } = await execFileAsync(resolveOpenClawBin(), args, {
+      timeout: OPENCLAW_COMMAND_TIMEOUT_MS,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    emitRuntimeLog(
+      "info",
+      `[gochat:runtime] openclaw exec ok: ${command} durationMs=${Date.now() - startedAt}`,
+    );
+    return extractJsonPayload([stdout, stderr].filter(Boolean).join("\n"));
+  } catch (error) {
+    const formatted = formatExecError(error);
+    emitRuntimeLog(
+      "warn",
+      `[gochat:runtime] openclaw exec failed: ${command} durationMs=${Date.now() - startedAt} error=${formatted.message}`,
+    );
+    throw formatted;
+  }
+}
+
+function formatExecError(error: unknown): Error {
+  if (!(error instanceof Error)) {
+    return new Error(String(error));
+  }
+  const details: string[] = [];
+  const stderr = String((error as Error & { stderr?: unknown }).stderr ?? "").trim();
+  const stdout = String((error as Error & { stdout?: unknown }).stdout ?? "").trim();
+  const code = (error as Error & { code?: unknown }).code;
+  const signal = (error as Error & { signal?: unknown }).signal;
+  if (code !== undefined && code !== null && String(code).trim()) {
+    details.push(`code=${String(code).trim()}`);
+  }
+  if (signal !== undefined && signal !== null && String(signal).trim()) {
+    details.push(`signal=${String(signal).trim()}`);
+  }
+  if (stderr) {
+    details.push(`stderr=${stderr}`);
+  } else if (stdout) {
+    details.push(`stdout=${stdout}`);
+  }
+  const suffix = details.length ? ` (${details.join("; ")})` : "";
+  return new Error(`${error.message}${suffix}`);
 }
 
 function normalizeSessionSnapshot(
@@ -299,10 +355,26 @@ export async function setOpenClawCurrentModel(model: string): Promise<void> {
   if (!nextModel) {
     throw new Error("model is required");
   }
-  await execFileAsync(resolveOpenClawBin(), ["models", "set", nextModel], {
-    timeout: OPENCLAW_COMMAND_TIMEOUT_MS,
-    maxBuffer: 2 * 1024 * 1024,
-  });
+  const command = formatCommand(["models", "set", nextModel]);
+  const startedAt = Date.now();
+  emitRuntimeLog("info", `[gochat:runtime] model set start: ${command}`);
+  try {
+    await execFileAsync(resolveOpenClawBin(), ["models", "set", nextModel], {
+      timeout: OPENCLAW_COMMAND_TIMEOUT_MS,
+      maxBuffer: 2 * 1024 * 1024,
+    });
+    emitRuntimeLog(
+      "info",
+      `[gochat:runtime] model set ok: ${command} durationMs=${Date.now() - startedAt}`,
+    );
+  } catch (error) {
+    const formatted = formatExecError(error);
+    emitRuntimeLog(
+      "warn",
+      `[gochat:runtime] model set failed: ${command} durationMs=${Date.now() - startedAt} error=${formatted.message}`,
+    );
+    throw formatted;
+  }
   cachedSnapshot = null;
 }
 
