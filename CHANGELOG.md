@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.35] - 2026-04-10
+
+### Fixed
+- Plugin-side runtime refresh now collects Sessions and Models independently, so `pairing required` failures from `gateway call sessions.list` no longer suppress the remote model list payload used by `/api/chat/models`
+- Relay logs now include OpenClaw runtime refresh counts and per-snapshot error details, making it visible when Sessions fail due to pairing while Models still refresh successfully
+
 ## [2026.4.9-plugin.34] - 2026-04-10
 
 ### Fixed

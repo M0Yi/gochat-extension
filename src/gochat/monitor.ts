@@ -350,12 +350,28 @@ export async function monitorGoChatProvider(
       const nextMetadata = await loadOpenClawRuntimeSnapshotMetadata({ forceRefresh });
       const currentSignature = JSON.stringify(openclawRuntimeMetadata);
       const nextSignature = JSON.stringify(nextMetadata);
+      const modelsCount = String(nextMetadata.openclawModelsCount ?? "").trim();
+      const sessionsCount = String(nextMetadata.openclawSessionsCount ?? "").trim();
+      const modelsError = String(nextMetadata.openclawModelsError ?? "").trim();
+      const sessionsError = String(nextMetadata.openclawSessionsError ?? "").trim();
+      if (modelsError || sessionsError) {
+        logger.warn(
+          `[gochat:${account.accountId}] openclaw runtime refresh: sessions=${sessionsCount || "n/a"} models=${modelsCount || "n/a"} sessionsError=${sessionsError || "-"} modelsError=${modelsError || "-"}`,
+        );
+      } else {
+        logger.info(
+          `[gochat:${account.accountId}] openclaw runtime refresh: sessions=${sessionsCount || "0"} models=${modelsCount || "0"}`,
+        );
+      }
       if (currentSignature === nextSignature) {
         return;
       }
       openclawRuntimeMetadata = nextMetadata;
       pushRelayStatusNow();
-    } catch {
+    } catch (error) {
+      logger.warn(
+        `[gochat:${account.accountId}] openclaw runtime refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       // keep last known snapshot metadata
     }
   };

@@ -202,29 +202,42 @@ async function loadDefaultAgentId(): Promise<string> {
 }
 
 async function buildOpenClawRuntimeMetadata(): Promise<Record<string, string>> {
-  const payload = await runOpenClawJson([
-    "gateway",
-    "call",
-    "sessions.list",
-    "--json",
-    "--params",
-    JSON.stringify({
-      activeMinutes: DEFAULT_ACTIVE_MINUTES,
-      limit: DEFAULT_LIMIT,
-      includeGlobal: true,
-      includeUnknown: true,
-    }),
-  ]);
-  const list = payload as OpenClawGatewaySessionsListResponse;
-  const defaultAgentId = await loadDefaultAgentId();
-  const snapshot = normalizeSessionSnapshot(list, defaultAgentId);
-  const modelsSnapshot = await loadOpenClawModelsSnapshot();
-  return {
-    openclawSessionsSource: snapshot.sourceMethod,
-    openclawSessionsCount: String(snapshot.count),
-    openclawSessionsJson: JSON.stringify(snapshot),
-    openclawModelsJson: JSON.stringify(modelsSnapshot),
-  };
+  const metadata: Record<string, string> = {};
+
+  try {
+    const payload = await runOpenClawJson([
+      "gateway",
+      "call",
+      "sessions.list",
+      "--json",
+      "--params",
+      JSON.stringify({
+        activeMinutes: DEFAULT_ACTIVE_MINUTES,
+        limit: DEFAULT_LIMIT,
+        includeGlobal: true,
+        includeUnknown: true,
+      }),
+    ]);
+    const list = payload as OpenClawGatewaySessionsListResponse;
+    const defaultAgentId = await loadDefaultAgentId();
+    const snapshot = normalizeSessionSnapshot(list, defaultAgentId);
+    metadata.openclawSessionsSource = snapshot.sourceMethod;
+    metadata.openclawSessionsCount = String(snapshot.count);
+    metadata.openclawSessionsJson = JSON.stringify(snapshot);
+  } catch (error) {
+    metadata.openclawSessionsSource = "plugin.gateway.call sessions.list";
+    metadata.openclawSessionsError = error instanceof Error ? error.message : String(error);
+  }
+
+  try {
+    const modelsSnapshot = await loadOpenClawModelsSnapshot();
+    metadata.openclawModelsJson = JSON.stringify(modelsSnapshot);
+    metadata.openclawModelsCount = String(modelsSnapshot.models.length);
+  } catch (error) {
+    metadata.openclawModelsError = error instanceof Error ? error.message : String(error);
+  }
+
+  return metadata;
 }
 
 async function loadOpenClawModelsSnapshot(): Promise<OpenClawModelsSnapshot> {
@@ -300,15 +313,7 @@ export async function loadOpenClawRuntimeSnapshotMetadata(params?: {
     return cachedSnapshot.metadata;
   }
 
-  let metadata: Record<string, string>;
-  try {
-    metadata = await buildOpenClawRuntimeMetadata();
-  } catch (error) {
-    metadata = {
-      openclawSessionsSource: "plugin.gateway.call sessions.list",
-      openclawSessionsError: error instanceof Error ? error.message : String(error),
-    };
-  }
+  const metadata = await buildOpenClawRuntimeMetadata();
 
   cachedSnapshot = {
     at: now,
