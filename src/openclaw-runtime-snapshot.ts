@@ -7,6 +7,7 @@ const execFileAsync = promisify(execFile);
 const CACHE_TTL_MS = 10_000;
 const DEFAULT_ACTIVE_MINUTES = 120;
 const DEFAULT_LIMIT = 120;
+const OPENCLAW_COMMAND_TIMEOUT_MS = 60_000;
 
 type OpenClawGatewaySessionsListResponse = {
   ts?: number;
@@ -140,7 +141,7 @@ function resolveStateDir(): string {
 
 async function runOpenClawJson(args: string[]): Promise<unknown> {
   const { stdout, stderr } = await execFileAsync(resolveOpenClawBin(), args, {
-    timeout: 12_000,
+    timeout: OPENCLAW_COMMAND_TIMEOUT_MS,
     maxBuffer: 4 * 1024 * 1024,
   });
   return extractJsonPayload([stdout, stderr].filter(Boolean).join("\n"));
@@ -299,7 +300,7 @@ export async function setOpenClawCurrentModel(model: string): Promise<void> {
     throw new Error("model is required");
   }
   await execFileAsync(resolveOpenClawBin(), ["models", "set", nextModel], {
-    timeout: 15_000,
+    timeout: OPENCLAW_COMMAND_TIMEOUT_MS,
     maxBuffer: 2 * 1024 * 1024,
   });
   cachedSnapshot = null;

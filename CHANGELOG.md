@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.36] - 2026-04-10
+
+### Fixed
+- Increased plugin-side OpenClaw command timeouts from roughly 12-15 seconds to 60 seconds, reducing Linux relay false failures when `openclaw models list --json`, `models set`, or related runtime snapshot commands respond slowly
+
 ## [2026.4.9-plugin.35] - 2026-04-10
 
 ### Fixed
