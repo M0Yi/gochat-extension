@@ -235,6 +235,8 @@ export async function monitorGoChatProvider(
   let activeStatusTimer: ReturnType<typeof setInterval> | null = null;
   let permissionPollTimer: ReturnType<typeof setInterval> | null = null;
   let openclawRuntimePollTimer: ReturnType<typeof setInterval> | null = null;
+  let subagentPermissionRefreshInFlight: Promise<void> | null = null;
+  let openclawRuntimeRefreshInFlight: Promise<void> | null = null;
   let subagentPermissionStatus: SubagentPermissionStatus = {
     state: "unknown",
     summary: "Subagent permission status is unavailable.",
@@ -333,47 +335,63 @@ export async function monitorGoChatProvider(
   };
 
   const refreshSubagentPermissionStatus = async (forceRefresh = false): Promise<void> => {
-    try {
-      const nextStatus = await inspectSubagentPermissionStatus({ forceRefresh });
-      if (nextStatus.detailSignature === subagentPermissionStatus.detailSignature) {
-        return;
-      }
-      subagentPermissionStatus = nextStatus;
-      pushRelayStatusNow();
-    } catch {
-      // keep last known metadata
+    if (subagentPermissionRefreshInFlight) {
+      return subagentPermissionRefreshInFlight;
     }
+    subagentPermissionRefreshInFlight = (async () => {
+      try {
+        const nextStatus = await inspectSubagentPermissionStatus({ forceRefresh });
+        if (nextStatus.detailSignature === subagentPermissionStatus.detailSignature) {
+          return;
+        }
+        subagentPermissionStatus = nextStatus;
+        pushRelayStatusNow();
+      } catch {
+        // keep last known metadata
+      } finally {
+        subagentPermissionRefreshInFlight = null;
+      }
+    })();
+    return subagentPermissionRefreshInFlight;
   };
 
   const refreshOpenClawRuntimeMetadata = async (forceRefresh = false): Promise<void> => {
-    try {
-      const nextMetadata = await loadOpenClawRuntimeSnapshotMetadata({ forceRefresh });
-      const currentSignature = JSON.stringify(openclawRuntimeMetadata);
-      const nextSignature = JSON.stringify(nextMetadata);
-      const modelsCount = String(nextMetadata.openclawModelsCount ?? "").trim();
-      const sessionsCount = String(nextMetadata.openclawSessionsCount ?? "").trim();
-      const modelsError = String(nextMetadata.openclawModelsError ?? "").trim();
-      const sessionsError = String(nextMetadata.openclawSessionsError ?? "").trim();
-      if (modelsError || sessionsError) {
-        logger.warn(
-          `[gochat:${account.accountId}] openclaw runtime refresh: sessions=${sessionsCount || "n/a"} models=${modelsCount || "n/a"} sessionsError=${sessionsError || "-"} modelsError=${modelsError || "-"}`,
-        );
-      } else {
-        logger.info(
-          `[gochat:${account.accountId}] openclaw runtime refresh: sessions=${sessionsCount || "0"} models=${modelsCount || "0"}`,
-        );
-      }
-      if (currentSignature === nextSignature) {
-        return;
-      }
-      openclawRuntimeMetadata = nextMetadata;
-      pushRelayStatusNow();
-    } catch (error) {
-      logger.warn(
-        `[gochat:${account.accountId}] openclaw runtime refresh failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      // keep last known snapshot metadata
+    if (openclawRuntimeRefreshInFlight) {
+      return openclawRuntimeRefreshInFlight;
     }
+    openclawRuntimeRefreshInFlight = (async () => {
+      try {
+        const nextMetadata = await loadOpenClawRuntimeSnapshotMetadata({ forceRefresh });
+        const currentSignature = JSON.stringify(openclawRuntimeMetadata);
+        const nextSignature = JSON.stringify(nextMetadata);
+        const modelsCount = String(nextMetadata.openclawModelsCount ?? "").trim();
+        const sessionsCount = String(nextMetadata.openclawSessionsCount ?? "").trim();
+        const modelsError = String(nextMetadata.openclawModelsError ?? "").trim();
+        const sessionsError = String(nextMetadata.openclawSessionsError ?? "").trim();
+        if (modelsError || sessionsError) {
+          logger.warn(
+            `[gochat:${account.accountId}] openclaw runtime refresh: sessions=${sessionsCount || "n/a"} models=${modelsCount || "n/a"} sessionsError=${sessionsError || "-"} modelsError=${modelsError || "-"}`,
+          );
+        } else {
+          logger.info(
+            `[gochat:${account.accountId}] openclaw runtime refresh: sessions=${sessionsCount || "0"} models=${modelsCount || "0"}`,
+          );
+        }
+        if (currentSignature === nextSignature) {
+          return;
+        }
+        openclawRuntimeMetadata = nextMetadata;
+        pushRelayStatusNow();
+      } catch (error) {
+        logger.warn(
+          `[gochat:${account.accountId}] openclaw runtime refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // keep last known snapshot metadata
+      } finally {
+        openclawRuntimeRefreshInFlight = null;
+      }
+    })();
+    return openclawRuntimeRefreshInFlight;
   };
 
   const { start: startRelay, stop: stopRelay, send: sendRelay, sendStatusNow } = createRelayWSConnection({

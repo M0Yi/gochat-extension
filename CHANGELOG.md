@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.37] - 2026-04-10
+
+### Fixed
+- Plugin runtime polls now coalesce in-flight subagent-permission and OpenClaw snapshot refreshes instead of spawning overlapping `openclaw` child processes every 10-20 seconds, reducing the risk of relay mode overwhelming slower Linux VMs or destabilizing the local Gateway
+
 ## [2026.4.9-plugin.36] - 2026-04-10
 
 ### Fixed
