@@ -6,9 +6,9 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.9-plugin.39"
+VERSION="2026.5.14-plugin.40"
 EXTENSION_NAME="gochat"
-OPENCLAW_MIN_VERSION="2026.3.28"
+OPENCLAW_MIN_VERSION="2026.5.7"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
 REPO_TARBALL_URL="https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 DEFAULT_RELAY_HTTP_URL="https://clawtile.moyi.vip"
@@ -67,6 +67,13 @@ warn_if_known_pairing_bug_host() {
   [ -z "${parsed}" ] && return 0
   parsed_key="$(version_triplet_key "${parsed}" || true)"
   [ -z "${parsed_key}" ] && return 0
+  local min_key
+  min_key="$(version_triplet_key "${OPENCLAW_MIN_VERSION}" || true)"
+  if [ -n "${min_key}" ] && [ "${parsed_key}" -lt "${min_key}" ]; then
+    warn "OpenClaw ${parsed} is older than the supported GoChat baseline ${OPENCLAW_MIN_VERSION}."
+    warn "Upgrade OpenClaw from https://github.com/openclaw/openclaw before relying on the latest GoChat plugin features."
+    return 0
+  fi
   if [ "${parsed_key}" -lt 20260408 ]; then
     warn "OpenClaw ${parsed} is older than 2026.4.8 and is known to surface local subagent pairing-required failures."
     warn "GoChat ${VERSION} now surfaces subagent permission status and approval commands in chat, but upgrading OpenClaw is still recommended."

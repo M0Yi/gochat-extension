@@ -1,13 +1,13 @@
 {
   "name": "@m0yi/gochat",
-  "version": "2026.4.9-plugin.39",
+  "version": "2026.5.14-plugin.40",
   "description": "OpenClaw GoChat channel plugin - WebSocket relay to GoChat platform (default) or local HTTP server",
   "type": "module",
   "dependencies": {
     "ws": "^8.18.0"
   },
   "peerDependencies": {
-    "openclaw": ">=2026.3.28"
+    "openclaw": ">=2026.5.7"
   },
   "peerDependenciesMeta": {
     "openclaw": {
@@ -20,8 +20,8 @@
     ],
     "setupEntry": "./setup-entry.ts",
     "compat": {
-      "pluginApi": ">=2026.3.24-beta.2",
-      "minGatewayVersion": "2026.3.28"
+      "pluginApi": ">=2026.5.7",
+      "minGatewayVersion": "2026.5.7"
     },
     "channel": {
       "id": "gochat",
@@ -36,7 +36,7 @@
     "install": {
       "npmSpec": "@m0yi/gochat",
       "defaultChoice": "npm",
-      "minHostVersion": ">=2026.3.24"
+      "minHostVersion": ">=2026.5.7"
     },
     "hooks": {}
   }

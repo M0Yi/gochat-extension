@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.5.14-plugin.40] - 2026-05-14
+
+### Changed
+- Updated the plugin compatibility baseline to OpenClaw `2026.5.7`, matching the latest stable upstream release from `openclaw/openclaw`.
+- Updated public install metadata, peer dependency requirements, and README requirements for the current OpenClaw external channel install flow.
+- Updated OpenClaw documentation links from the legacy `m0yi/openclaw` repository to `openclaw/openclaw`.
+
 ## [2026.4.9-plugin.39] - 2026-05-13
 
 ### Added

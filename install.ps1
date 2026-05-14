@@ -11,8 +11,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.9-plugin.39"
+$VERSION = "2026.5.14-plugin.40"
 $EXTENSION_NAME = "gochat"
+$OPENCLAW_MIN_VERSION = "2026.5.7"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
 $DEFAULT_RELAY_HTTP_URL = "https://clawtile.moyi.vip"
@@ -72,6 +73,12 @@ function Warn-IfKnownPairingBugHost {
     }
     $key = Get-VersionTripletKey $triplet
     if (-not $key) {
+        return
+    }
+    $minKey = Get-VersionTripletKey $OPENCLAW_MIN_VERSION
+    if ($minKey -and [int64]$key -lt [int64]$minKey) {
+        Write-Warn "OpenClaw $triplet is older than the supported GoChat baseline $OPENCLAW_MIN_VERSION."
+        Write-Warn "Upgrade OpenClaw from https://github.com/openclaw/openclaw before relying on the latest GoChat plugin features."
         return
     }
     if ([int64]$key -lt 20260408) {

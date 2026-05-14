@@ -1,6 +1,6 @@
 # GoChat Plugin for OpenClaw
 
-A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables custom chat backend integration via HTTP webhook. Supports **two operation modes**:
+A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) that enables custom chat backend integration via HTTP webhook. Supports **three operation modes**:
 
 - **Local mode** — Zero-config built-in HTTP API server on port 9750
 - **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://clawtile.moyi.vip/ws/plugin`
@@ -20,11 +20,11 @@ A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables c
 
 ## Requirements
 
-- OpenClaw >= 2026.3.28
-- Node.js >= 18
+- OpenClaw >= 2026.5.7
+- Node.js >= 22.16.0
 - npm >= 9
 
-OpenClaw `2026.4.8` or newer is recommended if you rely on local subagents or other operator actions that hop back through the gateway during a GoChat-triggered run.
+OpenClaw `2026.5.7` or newer is recommended for the current external channel install flow and latest channel runtime behavior.
 
 ---
 
@@ -396,7 +396,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Links
 
-- [OpenClaw Repository](https://github.com/m0yi/openclaw)
+- [OpenClaw Repository](https://github.com/openclaw/openclaw)
 - [GoChat Server](https://github.com/m0yi/gochat-server)
 - [Issue Tracker](https://github.com/M0Yi/gochat-extension/issues)
 - [Documentation](https://docs.openclaw.dev/channels/gochat)
