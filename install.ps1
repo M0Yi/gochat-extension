@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.5.14-plugin.43"
+$VERSION = "2026.5.14-plugin.44"
 $EXTENSION_NAME = "gochat"
 $OPENCLAW_MIN_VERSION = "2026.5.7"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"

@@ -1,6 +1,6 @@
 manifest_version: 1
 name: gochat
-version: "2026.5.14-plugin.43"
+version: "2026.5.14-plugin.44"
 description: GoChat / ClawTile integration for Hermes Agent.
 author: M0Yi
 kind: standalone

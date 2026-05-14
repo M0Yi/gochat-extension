@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import getpass
+import json
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
 
-PLUGIN_VERSION = "2026.5.14-plugin.43"
+PLUGIN_VERSION = "2026.5.14-plugin.44"
 DEFAULT_SERVER = "https://clawtile.moyi.vip"
 DEFAULT_MCP_NAME = "clawtile-agent"
 DEFAULT_MCP_ENV = "MCP_CLAWTILE_AGENT_API_KEY"
@@ -60,13 +63,55 @@ def _copytree_merge(src: Path, dst: Path) -> int:
     return count
 
 
+def _exchange_pair_code(server: str, code: str, display_name: str = "Hermes Agent") -> str:
+    code = (code or "").strip()
+    if not code:
+        raise SystemExit("Missing ClawTile pairing code.")
+
+    payload = json.dumps(
+        {
+            "code": code,
+            "display_name": display_name,
+            "agent_hint": "hermes",
+            "client_info": {
+                "platform": "hermes-gochat-plugin",
+                "version": PLUGIN_VERSION,
+            },
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"{_agent_base(server)}/pair/exchange",
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": f"gochat-hermes-plugin/{PLUGIN_VERSION}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise SystemExit(f"ClawTile pairing failed: HTTP {exc.code} {body}") from exc
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"ClawTile pairing failed: {exc.reason}") from exc
+
+    token = str(data.get("token") or "").strip()
+    if not token:
+        raise SystemExit("ClawTile pairing succeeded but no token was returned.")
+    return token
+
+
 def _save_mcp_config(args: Any) -> None:
     from hermes_cli.config import get_env_value, load_config, save_config, save_env_value
 
     name = args.name or DEFAULT_MCP_NAME
     env_key = args.env_key or DEFAULT_MCP_ENV
     server = args.server or DEFAULT_SERVER
-    token = (args.token or os.environ.get("CLAWTILE_TOKEN") or get_env_value(env_key) or "").strip()
+    code = getattr(args, "code", "") or ""
+    token = ""
+    if code.strip():
+        token = _exchange_pair_code(server, code, getattr(args, "display_name", "") or "Hermes Agent")
+    else:
+        token = (args.token or os.environ.get("CLAWTILE_TOKEN") or get_env_value(env_key) or "").strip()
 
     if not token and not args.no_prompt:
         token = getpass.getpass("ClawTile agent token (ct_a_...): ").strip()
@@ -97,7 +142,19 @@ def _save_mcp_config(args: Any) -> None:
 def _bridge_env(args: Any) -> dict[str, str]:
     env = dict(os.environ)
     server = args.server or DEFAULT_SERVER
-    token = (args.token or env.get("CLAWTILE_TOKEN") or "").strip()
+    token = ""
+    code = getattr(args, "code", "") or ""
+    if code.strip():
+        token = _exchange_pair_code(server, code, getattr(args, "display_name", "") or "Hermes Agent")
+    if not token:
+        token = (args.token or env.get("CLAWTILE_TOKEN") or "").strip()
+    if not token:
+        try:
+            from hermes_cli.config import get_env_value
+
+            token = (get_env_value(DEFAULT_MCP_ENV) or "").strip()
+        except Exception:
+            token = ""
     if not token and not getattr(args, "no_prompt", False):
         token = getpass.getpass("ClawTile agent token (ct_a_...): ").strip()
     if not token:
@@ -172,6 +229,8 @@ def _cmd_bridge_install_launchd(args: Any) -> None:
 
 def _add_common_connection_args(parser: Any) -> None:
     parser.add_argument("--server", default=DEFAULT_SERVER, help=f"ClawTile server URL (default: {DEFAULT_SERVER})")
+    parser.add_argument("--code", default="", help="ClawTile mini-program pairing code. Exchanges and saves a token without shell history exposure.")
+    parser.add_argument("--display-name", default="Hermes Agent", help="Display name shown in ClawTile after pairing.")
     parser.add_argument("--token", default="", help="ClawTile agent bearer token. Prefer CLAWTILE_TOKEN for shell history safety.")
     parser.add_argument("--no-prompt", action="store_true", help="Fail instead of prompting for a missing token.")
 

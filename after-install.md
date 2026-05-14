@@ -12,6 +12,12 @@ Then configure the ClawTile Agent MCP endpoint:
 hermes gochat mcp-configure
 ```
 
+If you have a 6-digit ClawTile mini-program pairing code, use it directly:
+
+```bash
+hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip
+```
+
 For always-on processing of completed ClawTile recordings:
 
 ```bash

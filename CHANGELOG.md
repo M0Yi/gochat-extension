@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.5.14-plugin.44] - 2026-05-14
+
+### Added
+- Added Hermes plugin pairing-code support via `hermes gochat mcp-configure --code <code>`, allowing ClawTile mini-program prompts to bind Hermes without exposing tokens in shell history.
+
+### Changed
+- Updated Hermes install guidance to prefer native plugin pairing from the mini-program code.
+
 ## [2026.5.14-plugin.43] - 2026-05-14
 
 ### Changed

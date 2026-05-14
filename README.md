@@ -52,8 +52,10 @@ For Hermes Agent native plugin mode:
 Please install the GoChat plugin for Hermes Agent from https://github.com/M0Yi/gochat-extension.
 Use Hermes plugin mode, not the standalone skills-only flow:
 hermes plugins install M0Yi/gochat-extension --enable
-Then run hermes gochat mcp-configure and show me the next command to start the online bridge.
-Do not store my token in shell history; prompt me securely or use the Hermes .env flow.
+If I provide a ClawTile mini-program pairing code, configure with:
+hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip
+Then show me the next command to start the online bridge.
+Do not store my token in shell history; use the pairing code or Hermes .env flow.
 ```
 
 For a Chinese assistant prompt:
@@ -62,7 +64,8 @@ For a Chinese assistant prompt:
 请帮我从 https://github.com/M0Yi/gochat-extension 安装 GoChat 插件。
 如果是 OpenClaw，请使用默认 relay 模式安装并验证插件目录。
 如果是 Hermes Agent，请使用插件模式安装：hermes plugins install M0Yi/gochat-extension --enable，
-然后执行 hermes gochat mcp-configure，最后告诉我如何启动 bridge。
+如果我提供了小程序配对码，请执行 hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip，
+最后告诉我如何启动 bridge。
 不要自动启动服务，不要修改无关配置，不要把 token 明文写进 shell 历史。
 ```
 
@@ -106,6 +109,12 @@ Configure ClawTile Agent MCP tools:
 hermes gochat mcp-configure
 ```
 
+Or bind directly with a 6-digit pairing code from the ClawTile mini-program:
+
+```bash
+hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip
+```
+
 Run the online bridge in the foreground:
 
 ```bash
@@ -143,7 +152,7 @@ hermes gochat bridge-run --once rec_xxx
        - Run: node --version && npm --version
        - If the user mentions Hermes Agent, prefer Hermes plugin mode:
            hermes plugins install M0Yi/gochat-extension --enable
-           hermes gochat mcp-configure
+           hermes gochat mcp-configure --code <MINI_PROGRAM_PAIR_CODE> --server https://clawtile.moyi.vip
            hermes gochat status
          Then show:
            hermes gochat bridge-run
