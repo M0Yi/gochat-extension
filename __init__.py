@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 
-PLUGIN_VERSION = "2026.5.14-plugin.42"
+PLUGIN_VERSION = "2026.5.14-plugin.43"
 DEFAULT_SERVER = "https://clawtile.moyi.vip"
 DEFAULT_MCP_NAME = "clawtile-agent"
 DEFAULT_MCP_ENV = "MCP_CLAWTILE_AGENT_API_KEY"

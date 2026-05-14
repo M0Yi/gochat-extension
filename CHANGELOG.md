@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.5.14-plugin.43] - 2026-05-14
+
+### Changed
+- Moved AI assistant onboarding prompts into the public README so users can ask an AI to install the OpenClaw channel plugin or Hermes-native plugin directly from the repository.
+- Updated the AI-readable install context to choose Hermes plugin mode when the user asks for Hermes Agent integration.
+
 ## [2026.5.14-plugin.42] - 2026-05-14
 
 ### Added

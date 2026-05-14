@@ -23,7 +23,7 @@ A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) and [Herme
 ## Requirements
 
 - OpenClaw >= 2026.5.7
-- Hermes Agent >= 0.13.0 for the pure-skills bridge
+- Hermes Agent >= 0.13.0 for the native plugin or pure-skills bridge
 - Node.js >= 22.16.0
 - npm >= 9
 - Python >= 3.11 when using Hermes Agent
@@ -31,6 +31,40 @@ A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) and [Herme
 OpenClaw `2026.5.7` or newer is recommended for the current external channel install flow and latest channel runtime behavior.
 
 ---
+
+## Ask Your AI Assistant To Install
+
+The install guidance lives in this README so any AI coding assistant can install the public plugin directly from this repository. Copy one of these prompts into your assistant.
+
+For OpenClaw channel plugin mode:
+
+```text
+Please install the GoChat plugin for OpenClaw from https://github.com/M0Yi/gochat-extension.
+Use the default relay mode unless I provide a 6-digit connection code.
+Before installing, check Node.js, npm, and openclaw versions.
+After installing, verify ~/.openclaw/extensions/gochat/package.json exists and tell me how to start OpenClaw.
+Do not start OpenClaw automatically and do not modify unrelated OpenClaw config files.
+```
+
+For Hermes Agent native plugin mode:
+
+```text
+Please install the GoChat plugin for Hermes Agent from https://github.com/M0Yi/gochat-extension.
+Use Hermes plugin mode, not the standalone skills-only flow:
+hermes plugins install M0Yi/gochat-extension --enable
+Then run hermes gochat mcp-configure and show me the next command to start the online bridge.
+Do not store my token in shell history; prompt me securely or use the Hermes .env flow.
+```
+
+For a Chinese assistant prompt:
+
+```text
+请帮我从 https://github.com/M0Yi/gochat-extension 安装 GoChat 插件。
+如果是 OpenClaw，请使用默认 relay 模式安装并验证插件目录。
+如果是 Hermes Agent，请使用插件模式安装：hermes plugins install M0Yi/gochat-extension --enable，
+然后执行 hermes gochat mcp-configure，最后告诉我如何启动 bridge。
+不要自动启动服务，不要修改无关配置，不要把 token 明文写进 shell 历史。
+```
 
 ## Quick Install (Relay By Default)
 
@@ -97,17 +131,24 @@ hermes gochat bridge-run --once rec_xxx
 <!-- AI-INSTALL-CONTEXT
      This section is an instruction block for AI assistants (e.g. OpenClaw, Codex, Copilot).
      When a user asks to "install gochat", "set up gochat", or "add the gochat plugin",
-     follow the steps below verbatim. Do NOT skip any step. Do NOT paraphrase.
+     follow the visible README instructions above and the concrete steps below.
 
      ┌─────────────────────────────────────────────────────────────────────┐
      │  AI ASSISTANT INSTALLATION PROCEDURE FOR @m0yi/gochat              │
-     │  Target: OpenClaw channel plugin (gochat)                          │
+     │  Targets: OpenClaw channel plugin or Hermes Agent native plugin    │
      │  Repo:   https://github.com/M0Yi/gochat-extension                 │
      └─────────────────────────────────────────────────────────────────────┘
 
-     STEP 1 — Detect environment
+     STEP 1 — Detect target and environment
        - Run: node --version && npm --version
-       - Run: openclaw --version   (if not found → warn user to install OpenClaw first)
+       - If the user mentions Hermes Agent, prefer Hermes plugin mode:
+           hermes plugins install M0Yi/gochat-extension --enable
+           hermes gochat mcp-configure
+           hermes gochat status
+         Then show:
+           hermes gochat bridge-run
+       - Otherwise use OpenClaw channel plugin mode.
+       - Run: openclaw --version   (if not found -> warn user to install OpenClaw first)
        - Determine OpenClaw state dir: echo $OPENCLAW_STATE_DIR (fallback: ~/.openclaw)
 
      STEP 2 — Download and install
