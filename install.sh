@@ -6,7 +6,7 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.5.14-plugin.40"
+VERSION="2026.5.14-plugin.41"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.5.7"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
@@ -317,6 +317,20 @@ get_skills_dir() {
   echo "${openclaw_dir}/skills"
 }
 
+get_hermes_dir() {
+  if [ -n "${HERMES_HOME:-}" ]; then
+    echo "${HERMES_HOME}"
+    return
+  fi
+  echo "${HOME}/.hermes"
+}
+
+get_hermes_skills_dir() {
+  local hermes_dir
+  hermes_dir="$(get_hermes_dir)"
+  echo "${hermes_dir}/skills"
+}
+
 get_config_file() {
   local openclaw_dir
   openclaw_dir="$(get_openclaw_dir)"
@@ -532,18 +546,13 @@ install_from_source() {
   install_bundled_skills "${extensions_dir}/${EXTENSION_NAME}"
 }
 
-install_bundled_skills() {
-  local extension_dir="$1"
-  local source_skills_dir="${extension_dir}/skills"
-  local target_skills_dir
-  target_skills_dir="$(get_skills_dir)"
-
-  if [ ! -d "${source_skills_dir}" ]; then
-    return 0
-  fi
+install_skills_to_dir() {
+  local source_skills_dir="$1"
+  local target_skills_dir="$2"
+  local label="$3"
 
   ensure_dir_writable "${target_skills_dir}"
-  info "Installing bundled skills to ${target_skills_dir}..."
+  info "Installing bundled skills to ${label}: ${target_skills_dir}..."
 
   if command -v rsync >/dev/null 2>&1; then
     rsync -a "${source_skills_dir}/" "${target_skills_dir}/"
@@ -552,7 +561,30 @@ install_bundled_skills() {
     cp -R "${source_skills_dir}/." "${target_skills_dir}/"
   fi
 
-  ok "Bundled skills installed"
+  ok "Bundled skills installed for ${label}"
+}
+
+should_install_hermes_skills() {
+  [ -n "${HERMES_HOME:-}" ] && return 0
+  [ -d "${HOME}/.hermes" ] && return 0
+  command -v hermes >/dev/null 2>&1 && return 0
+  command -v hermes-agent >/dev/null 2>&1 && return 0
+  return 1
+}
+
+install_bundled_skills() {
+  local extension_dir="$1"
+  local source_skills_dir="${extension_dir}/skills"
+
+  if [ ! -d "${source_skills_dir}" ]; then
+    return 0
+  fi
+
+  install_skills_to_dir "${source_skills_dir}" "$(get_skills_dir)" "OpenClaw"
+
+  if should_install_hermes_skills; then
+    install_skills_to_dir "${source_skills_dir}" "$(get_hermes_skills_dir)" "Hermes Agent"
+  fi
 }
 
 install_piped() {

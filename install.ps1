@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.5.14-plugin.40"
+$VERSION = "2026.5.14-plugin.41"
 $EXTENSION_NAME = "gochat"
 $OPENCLAW_MIN_VERSION = "2026.5.7"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
@@ -287,6 +287,33 @@ function Get-SkillsDir {
     return Join-Path (Get-OpenClawDir) "skills"
 }
 
+function Get-HermesDir {
+    if ($env:HERMES_HOME) {
+        return $env:HERMES_HOME
+    }
+    return Join-Path $env:USERPROFILE ".hermes"
+}
+
+function Get-HermesSkillsDir {
+    return Join-Path (Get-HermesDir) "skills"
+}
+
+function Test-HermesAvailable {
+    if ($env:HERMES_HOME) {
+        return $true
+    }
+    if (Test-Path (Get-HermesDir)) {
+        return $true
+    }
+    if (Get-Command "hermes" -ErrorAction SilentlyContinue) {
+        return $true
+    }
+    if (Get-Command "hermes-agent" -ErrorAction SilentlyContinue) {
+        return $true
+    }
+    return $false
+}
+
 function Ensure-DirWritable {
     param([string]$TargetDir)
 
@@ -415,11 +442,24 @@ function Install-BundledSkills {
         return
     }
 
-    $targetSkillsDir = Get-SkillsDir
-    Ensure-DirWritable $targetSkillsDir
-    Write-Info "Installing bundled skills to $targetSkillsDir..."
+    Install-SkillsToDir $sourceSkillsDir (Get-SkillsDir) "OpenClaw"
 
-    Get-ChildItem -LiteralPath $sourceSkillsDir -Directory -Force | ForEach-Object {
+    if (Test-HermesAvailable) {
+        Install-SkillsToDir $sourceSkillsDir (Get-HermesSkillsDir) "Hermes Agent"
+    }
+}
+
+function Install-SkillsToDir {
+    param(
+        [string]$SourceSkillsDir,
+        [string]$TargetSkillsDir,
+        [string]$Label
+    )
+
+    Ensure-DirWritable $targetSkillsDir
+    Write-Info "Installing bundled skills to $Label`: $TargetSkillsDir..."
+
+    Get-ChildItem -LiteralPath $SourceSkillsDir -Directory -Force | ForEach-Object {
         $destination = Join-Path $targetSkillsDir $_.Name
         if (Test-Path $destination) {
             Remove-DirIfExists $destination
@@ -427,7 +467,7 @@ function Install-BundledSkills {
         Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse -Force
     }
 
-    Write-Ok "Bundled skills installed"
+    Write-Ok "Bundled skills installed for $Label"
 }
 
 function Install-Remote {

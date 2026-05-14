@@ -1,10 +1,11 @@
 # GoChat Plugin for OpenClaw
 
-A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) that enables custom chat backend integration via HTTP webhook. Supports **three operation modes**:
+A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) and [Hermes Agent](https://github.com/NousResearch/hermes-agent) that enables custom chat backend integration via HTTP webhook, MCP, or a pure-skills online bridge. Supports these operation modes:
 
 - **Local mode** — Zero-config built-in HTTP API server on port 9750
 - **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://clawtile.moyi.vip/ws/plugin`
 - **Agent mode** — account-level ClawTile agent binding via the mini-program 6-digit code
+- **Hermes skills mode** — pure skills + MCP/SSE bridge for [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
 ## Features
 
@@ -21,8 +22,10 @@ A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) that enabl
 ## Requirements
 
 - OpenClaw >= 2026.5.7
+- Hermes Agent >= 0.13.0 for the pure-skills bridge
 - Node.js >= 22.16.0
 - npm >= 9
+- Python >= 3.11 when using Hermes Agent
 
 OpenClaw `2026.5.7` or newer is recommended for the current external channel install flow and latest channel runtime behavior.
 
@@ -187,8 +190,28 @@ channels:
     relayPlatformUrl: wss://clawtile.moyi.vip/ws/plugin
 ```
 
-The installer also copies bundled GoChat skills into `~/.openclaw/skills`, including the local audio workflow skill `gochat-local-audio-notes`.
-That skill bundles a local transcription script with multiple backend choices such as `whisper`, `faster-whisper`, `mlx-whisper`, and `whisper.cpp` when available.
+The installer also copies bundled GoChat skills into `~/.openclaw/skills`. If Hermes Agent is installed or `HERMES_HOME` is set, it also copies the same skills into `~/.hermes/skills`.
+
+Hermes Agent online bridge:
+
+```bash
+hermes mcp add clawtile-agent --url https://clawtile.moyi.vip/api/agent/mcp --auth header
+```
+
+For an always-on pure-skills bridge that listens for completed ClawTile recordings and runs `hermes -z` automatically:
+
+```bash
+CLAWTILE_TOKEN="ct_a_xxx" \
+bash ~/.hermes/skills/clawtile-hermes-online/scripts/clawtile_hermes_bridge.sh
+```
+
+On macOS, install it as a LaunchAgent:
+
+```bash
+CLAWTILE_TOKEN="ct_a_xxx" \
+bash ~/.hermes/skills/clawtile-hermes-online/scripts/install_launchd.sh
+```
+The local audio skill bundles a transcription script with multiple backend choices such as `whisper`, `faster-whisper`, `mlx-whisper`, and `whisper.cpp` when available.
 Fresh installs stay on the chosen mode and do not run any automatic gateway authorization workflow by default.
 If you explicitly switch an existing account between `local` and `relay`, first authorize that one-time switch from the CLI:
 
@@ -397,6 +420,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Links
 
 - [OpenClaw Repository](https://github.com/openclaw/openclaw)
+- [Hermes Agent Repository](https://github.com/NousResearch/hermes-agent)
 - [GoChat Server](https://github.com/m0yi/gochat-server)
 - [Issue Tracker](https://github.com/M0Yi/gochat-extension/issues)
 - [Documentation](https://docs.openclaw.dev/channels/gochat)

@@ -1,7 +1,7 @@
 {
   "name": "@m0yi/gochat",
-  "version": "2026.5.14-plugin.40",
-  "description": "OpenClaw GoChat channel plugin - WebSocket relay to GoChat platform (default) or local HTTP server",
+  "version": "2026.5.14-plugin.41",
+  "description": "GoChat channel plugin and skills bridge for OpenClaw and Hermes Agent",
   "type": "module",
   "dependencies": {
     "ws": "^8.18.0"
