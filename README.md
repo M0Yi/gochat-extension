@@ -3,7 +3,8 @@
 A channel plugin for [OpenClaw](https://github.com/m0yi/openclaw) that enables custom chat backend integration via HTTP webhook. Supports **two operation modes**:
 
 - **Local mode** — Zero-config built-in HTTP API server on port 9750
-- **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://fund.moyi.vip/ws/plugin`
+- **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://clawtile.moyi.vip/ws/plugin`
+- **Agent mode** — account-level ClawTile agent binding via the mini-program 6-digit code
 
 ## Features
 
@@ -37,7 +38,7 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
 & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1')))
 ```
 
-Use a 6-digit connection code for zero-config pairing:
+Use a 6-digit relay connection code for legacy relay pairing:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh | bash -s -- 123456
@@ -45,6 +46,12 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
 
 ```powershell
 & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1'))) -Code '123456'
+```
+
+Bind OpenClaw as the account-level ClawTile agent:
+
+```bash
+openclaw gochat bind-agent --code 123456 --server https://clawtile.moyi.vip
 ```
 
 ---
@@ -177,7 +184,7 @@ Relay mode connects to the GoChat platform WebSocket relay.
 channels:
   gochat:
     mode: relay
-    relayPlatformUrl: wss://fund.moyi.vip/ws/plugin
+    relayPlatformUrl: wss://clawtile.moyi.vip/ws/plugin
 ```
 
 The installer also copies bundled GoChat skills into `~/.openclaw/skills`, including the local audio workflow skill `gochat-local-audio-notes`.
@@ -222,7 +229,7 @@ channels:
     # Extra trusted hosts for inbound attachment fetches.
     # The relay host from relayPlatformUrl is trusted automatically.
     trustedAttachmentHosts:
-      - fund.moyi.vip
+      - clawtile.moyi.vip
 
     # Optional local transcription for inbound audio attachments
     localAudioTranscription:

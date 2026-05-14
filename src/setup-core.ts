@@ -29,6 +29,9 @@ type GoChatSetupInput = ChannelSetupInput & {
   secretFile?: string;
   relayPlatformUrl?: string;
   channelId?: string;
+  agentServerUrl?: string;
+  agentToken?: string;
+  agentTokenFile?: string;
 };
 type GoChatSection = NonNullable<CoreConfig["channels"]>["gochat"];
 
@@ -234,6 +237,17 @@ export const gochatSetupAdapter: ChannelSetupAdapter = {
       nextCfg = setGoChatAccountConfig(nextCfg, accountId, patch);
       nextCfg = await autoRegisterRelay(nextCfg, accountId);
       return nextCfg;
+    }
+
+    if (setupInput.agentServerUrl || setupInput.agentToken || setupInput.agentTokenFile) {
+      patch.mode = "agent";
+      patch.agentServerUrl = (setupInput.agentServerUrl || DEFAULT_RELAY_HTTP_URL).trim().replace(/\/+$/, "");
+      if (setupInput.agentTokenFile) {
+        patch.agentTokenFile = setupInput.agentTokenFile;
+      } else if (setupInput.agentToken) {
+        patch.agentToken = setupInput.agentToken;
+      }
+      return setGoChatAccountConfig(nextCfg, accountId, patch);
     }
 
     if (!setupInput.useEnv) {

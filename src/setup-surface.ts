@@ -19,7 +19,7 @@ import {
   getGoChatModeSwitchAuthorizationStatus,
 } from "./mode-switch-authorization.js";
 import type { CoreConfig } from "./types.js";
-import { DEFAULT_RELAY_HTTP_URL, DEFAULT_RELAY_WS_URL } from "./types.js";
+import { DEFAULT_CLAWTILE_HTTP_URL, DEFAULT_RELAY_HTTP_URL, DEFAULT_RELAY_WS_URL } from "./types.js";
 
 const channel = "gochat" as const;
 
@@ -44,6 +44,7 @@ export const gochatSetupWizard: ChannelSetupWizard = {
     title: "GoChat setup",
     lines: [
       "Choose mode: local (built-in server) or relay (connect to GoChat platform).",
+      "Use agent mode after running: openclaw gochat bind-agent --code 123456",
       "Fresh setup is automatic. Switching an existing account between local and relay requires a one-time CLI authorization.",
       `Docs: ${formatDocsLink("/channels/gochat", "channels/gochat")}`,
     ],
@@ -56,17 +57,17 @@ export const gochatSetupWizard: ChannelSetupWizard = {
   textInputs: [
     {
       inputKey: "mode",
-      message: "Choose mode [local/relay] (default: relay)",
+      message: "Choose mode [local/relay/agent] (default: relay)",
       currentValue: ({ cfg, accountId }) =>
         resolveGoChatAccount({ cfg: cfg as CoreConfig, accountId }).mode ?? "relay",
       shouldPrompt: () => true,
       validate: ({ value }) =>
-        value === "local" || value === "relay"
+        value === "local" || value === "relay" || value === "agent"
           ? undefined
-          : "Mode must be 'local' or 'relay'",
+          : "Mode must be 'local', 'relay', or 'agent'",
       normalizeValue: ({ value }) => (value?.trim().toLowerCase() || "relay") as string,
       applySet: async (params) => {
-        const mode = (params.value?.trim().toLowerCase() || "relay") as "local" | "relay";
+        const mode = (params.value?.trim().toLowerCase() || "relay") as "local" | "relay" | "agent";
         const currentAccount = resolveGoChatAccount({
           cfg: params.cfg as CoreConfig,
           accountId: params.accountId,
@@ -125,6 +126,11 @@ export const gochatSetupWizard: ChannelSetupWizard = {
               relayPlatformUrl: DEFAULT_RELAY_WS_URL,
             });
           }
+        } else if (mode === "agent") {
+          nextCfg = setGoChatAccountConfig(nextCfg, params.accountId, {
+            agentServerUrl: DEFAULT_CLAWTILE_HTTP_URL,
+          });
+          console.log(`[gochat:setup] agent mode configured - bind with: openclaw gochat bind-agent --code 123456`);
         } else {
           console.log(`[gochat:setup] local mode configured - built-in server will start on port 9750`);
         }
@@ -144,6 +150,8 @@ export const gochatSetupWizard: ChannelSetupWizard = {
         if (finalAccount.mode === "relay") {
           console.log(`[gochat:setup]   relayUrl:     ${finalAccount.relayPlatformUrl}`);
           console.log(`[gochat:setup]   channelId:    ${finalAccount.channelId || "(pending)"}`);
+        } else if (finalAccount.mode === "agent") {
+          console.log(`[gochat:setup]   agentServer:  ${finalAccount.agentServerUrl}`);
         } else {
           console.log(`[gochat:setup]   port:         ${finalAccount.directPort}`);
         }

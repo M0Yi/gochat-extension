@@ -16,7 +16,7 @@ export type GoChatConversationConfig = {
   systemPrompt?: string;
 };
 
-export type GoChatMode = "local" | "relay";
+export type GoChatMode = "local" | "relay" | "agent";
 
 export type GoChatLocalAudioTranscriptionConfig = {
   enabled?: boolean;
@@ -44,8 +44,9 @@ export type GoChatModeSwitchAuthorizationConfig = {
 
 export const DEFAULT_LOCAL_PORT = 9750;
 export const DEFAULT_LOCAL_HOST = "0.0.0.0";
-export const DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin";
-export const DEFAULT_RELAY_HTTP_URL = "https://fund.moyi.vip";
+export const DEFAULT_CLAWTILE_HTTP_URL = "https://clawtile.moyi.vip";
+export const DEFAULT_RELAY_WS_URL = "wss://clawtile.moyi.vip/ws/plugin";
+export const DEFAULT_RELAY_HTTP_URL = DEFAULT_CLAWTILE_HTTP_URL;
 
 export type GoChatAccountConfig = {
   name?: string;
@@ -75,6 +76,9 @@ export type GoChatAccountConfig = {
   directHost?: string;
   relayPlatformUrl?: string;
   channelId?: string;
+  agentServerUrl?: string;
+  agentToken?: SecretInput;
+  agentTokenFile?: string;
 };
 
 export type GoChatConfig = {

@@ -34,6 +34,7 @@ import {
 
 import { GoChatConfigSchema } from "./config-schema.js";
 import { GoChatChannelConfigSchema } from "./config-surface.js";
+import { monitorGoChatAgentProvider } from "./gochat/agent-monitor.js";
 import { monitorGoChatProvider } from "./gochat/monitor.js";
 import { resolveGoChatGroupToolPolicy } from "./policy.js";
 import { getGoChatRuntime } from "./runtime.js";
@@ -57,7 +58,7 @@ const meta = {
   selectionLabel: "GoChat (custom)",
   docsPath: "/channels/gochat",
   docsLabel: "gochat",
-  blurb: "Custom chat backend. Local mode (built-in API) or relay mode (GoChat platform). Supports text, images, audio, and file attachments.",
+  blurb: "Custom chat backend. Local, relay, or ClawTile account-level agent mode. Supports text, images, audio, and file attachments.",
   order: 90,
   quickstartAllowFrom: true,
 };
@@ -71,7 +72,7 @@ const gochatConfigAdapter = createScopedChannelConfigAdapter<
   listAccountIds: listGoChatAccountIds,
   resolveAccount: adaptScopedAccountAccessor(resolveGoChatAccount),
   defaultAccountId: resolveDefaultGoChatAccountId,
-  clearBaseFields: ["webhookSecret", "webhookSecretFile", "name"],
+  clearBaseFields: ["webhookSecret", "webhookSecretFile", "agentToken", "agentTokenFile", "name"],
   resolveAllowFrom: (account) => account.config.allowFrom,
   formatAllowFrom: (allowFrom) =>
     formatAllowFromLowercase({
@@ -235,6 +236,10 @@ export const gochatPlugin: ChannelPlugin<ResolvedGoChatAccount> = createChatChan
           console.log(`[gochat]   relayUrl:      ${account.relayPlatformUrl}`);
           console.log(`[gochat]   channelId:     ${account.channelId || "(pending auto-register)"}`);
         }
+        if (account.mode === "agent") {
+          console.log(`[gochat]   agentServer:   ${account.agentServerUrl}`);
+          console.log(`[gochat]   agentToken:    ${account.secret ? "configured" : "(not set)"}`);
+        }
         console.log(`[gochat]   dmPolicy:      ${account.config.dmPolicy ?? "open"}`);
         console.log(`[gochat]   groupPolicy:   ${account.config.groupPolicy ?? "allowlist"}`);
         if (account.config.allowFrom?.length) {
@@ -294,6 +299,22 @@ export const gochatPlugin: ChannelPlugin<ResolvedGoChatAccount> = createChatChan
 
           const baseUrl = getBaseUrl();
           ctx.log?.info(`[gochat:${account.accountId}] local server listening on ${baseUrl}`);
+          return;
+        }
+
+        if (account.mode === "agent") {
+          ctx.log?.info(`[${account.accountId}] starting GoChat agent connection to ${account.agentServerUrl}`);
+          await runStoppablePassiveMonitor({
+            abortSignal: ctx.abortSignal,
+            start: async () =>
+              await monitorGoChatAgentProvider({
+                accountId: account.accountId,
+                config: ctx.cfg as CoreConfig,
+                runtime: ctx.runtime,
+                abortSignal: ctx.abortSignal,
+                statusSink,
+              }),
+          });
           return;
         }
 
@@ -361,10 +382,20 @@ export const gochatPlugin: ChannelPlugin<ResolvedGoChatAccount> = createChatChan
             cleared = true;
             changed = true;
           }
+          if (accountId === DEFAULT_ACCOUNT_ID && nextSection.agentToken) {
+            delete nextSection.agentToken;
+            cleared = true;
+            changed = true;
+          }
+          if (accountId === DEFAULT_ACCOUNT_ID && nextSection.agentTokenFile) {
+            delete nextSection.agentTokenFile;
+            cleared = true;
+            changed = true;
+          }
           const accountCleanup = clearAccountEntryFields({
             accounts: nextSection.accounts,
             accountId,
-            fields: ["webhookSecret"],
+            fields: ["webhookSecret", "agentToken", "agentTokenFile"],
           });
           if (accountCleanup.changed) {
             changed = true;

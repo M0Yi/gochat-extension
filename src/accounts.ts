@@ -9,7 +9,7 @@ import {
 } from "../runtime-api.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import type { CoreConfig, GoChatAccountConfig, GoChatMode } from "./types.js";
-import { DEFAULT_LOCAL_PORT, DEFAULT_LOCAL_HOST, DEFAULT_RELAY_WS_URL } from "./types.js";
+import { DEFAULT_CLAWTILE_HTTP_URL, DEFAULT_LOCAL_PORT, DEFAULT_LOCAL_HOST, DEFAULT_RELAY_WS_URL } from "./types.js";
 
 function isTruthyEnvValue(value?: string): boolean {
   const normalized = (value ?? "").trim().toLowerCase();
@@ -33,6 +33,7 @@ export type ResolvedGoChatAccount = {
   directHost: string;
   relayPlatformUrl: string;
   channelId: string;
+  agentServerUrl: string;
   config: GoChatAccountConfig;
 };
 
@@ -63,6 +64,7 @@ function normalizeGoChatMode(raw: string | undefined): GoChatMode {
   const lower = raw.toLowerCase().trim();
   if (lower === "local" || lower === "direct") return "local";
   if (lower === "relay" || lower === "relay-ws") return "relay";
+  if (lower === "agent" || lower === "clawtile-agent") return "agent";
   return "relay";
 }
 
@@ -93,28 +95,54 @@ function resolveGoChatSecret(
 ): { secret: string; source: ResolvedGoChatAccount["secretSource"] } {
   const merged = mergeGoChatAccountConfig(cfg, opts.accountId ?? DEFAULT_ACCOUNT_ID);
 
-  const envSecret = process.env.GOCHAT_WEBHOOK_SECRET?.trim();
-  if (envSecret && (!opts.accountId || opts.accountId === DEFAULT_ACCOUNT_ID)) {
-    return { secret: envSecret, source: "env" };
-  }
+  if (opts.mode !== "agent") {
+    const envSecret = process.env.GOCHAT_WEBHOOK_SECRET?.trim();
+    if (envSecret && (!opts.accountId || opts.accountId === DEFAULT_ACCOUNT_ID)) {
+      return { secret: envSecret, source: "env" };
+    }
 
-  if (merged.webhookSecretFile) {
-    const fileSecret = tryReadSecretFileSync(
-      merged.webhookSecretFile,
-      "GoChat webhook secret file",
-      { rejectSymlink: true },
-    );
-    if (fileSecret) {
-      return { secret: fileSecret, source: "secretFile" };
+    if (merged.webhookSecretFile) {
+      const fileSecret = tryReadSecretFileSync(
+        merged.webhookSecretFile,
+        "GoChat webhook secret file",
+        { rejectSymlink: true },
+      );
+      if (fileSecret) {
+        return { secret: fileSecret, source: "secretFile" };
+      }
+    }
+
+    const inlineSecret = normalizeResolvedSecretInputString({
+      value: merged.webhookSecret,
+      path: `channels.gochat.accounts.${opts.accountId ?? DEFAULT_ACCOUNT_ID}.webhookSecret`,
+    });
+    if (inlineSecret) {
+      return { secret: inlineSecret, source: "config" };
     }
   }
 
-  const inlineSecret = normalizeResolvedSecretInputString({
-    value: merged.webhookSecret,
-    path: `channels.gochat.accounts.${opts.accountId ?? DEFAULT_ACCOUNT_ID}.webhookSecret`,
-  });
-  if (inlineSecret) {
-    return { secret: inlineSecret, source: "config" };
+  if (opts.mode === "agent") {
+    const envAgentToken = process.env.GOCHAT_AGENT_TOKEN?.trim();
+    if (envAgentToken && (!opts.accountId || opts.accountId === DEFAULT_ACCOUNT_ID)) {
+      return { secret: envAgentToken, source: "env" };
+    }
+    if (merged.agentTokenFile) {
+      const fileToken = tryReadSecretFileSync(
+        merged.agentTokenFile,
+        "GoChat agent token file",
+        { rejectSymlink: true },
+      );
+      if (fileToken) {
+        return { secret: fileToken, source: "secretFile" };
+      }
+    }
+    const inlineToken = normalizeResolvedSecretInputString({
+      value: merged.agentToken,
+      path: `channels.gochat.accounts.${opts.accountId ?? DEFAULT_ACCOUNT_ID}.agentToken`,
+    });
+    if (inlineToken) {
+      return { secret: inlineToken, source: "config" };
+    }
   }
 
   if (opts.mode === "local") {
@@ -140,6 +168,7 @@ export function resolveGoChatAccount(params: {
     const directHost = merged.directHost ?? DEFAULT_LOCAL_HOST;
     const relayPlatformUrl = merged.relayPlatformUrl?.trim()?.replace(/\/+$/, "") || DEFAULT_RELAY_WS_URL;
     const channelId = merged.channelId?.trim() ?? "";
+    const agentServerUrl = merged.agentServerUrl?.trim()?.replace(/\/+$/, "") || DEFAULT_CLAWTILE_HTTP_URL;
 
     debugAccounts("resolve", {
       accountId,
@@ -159,6 +188,7 @@ export function resolveGoChatAccount(params: {
       directHost,
       relayPlatformUrl,
       channelId,
+      agentServerUrl,
       config: merged,
     } satisfies ResolvedGoChatAccount;
 
@@ -167,6 +197,7 @@ export function resolveGoChatAccount(params: {
       ` secretSource=${secretResolution.source}` +
       (mode === "local" ? ` port=${directPort} host=${directHost}` : "") +
       (mode === "relay" ? ` relayUrl=${relayPlatformUrl} channelId=${channelId || "(pending)"}` : "") +
+      (mode === "agent" ? ` agentServer=${agentServerUrl}` : "") +
       ` dmPolicy=${merged.dmPolicy ?? "open"}` +
       ` blockStreaming=${merged.blockStreaming !== false}`,
     );

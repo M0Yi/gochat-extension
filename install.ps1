@@ -11,12 +11,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "2026.4.9-plugin.38"
+$VERSION = "2026.4.9-plugin.39"
 $EXTENSION_NAME = "gochat"
 $REPO_TARBALL_URL = "https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
 $REMOTE_INSTALL_PS_URL = "https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.ps1"
-$DEFAULT_RELAY_HTTP_URL = "https://fund.moyi.vip"
-$DEFAULT_RELAY_WS_URL = "wss://fund.moyi.vip/ws/plugin"
+$DEFAULT_RELAY_HTTP_URL = "https://clawtile.moyi.vip"
+$DEFAULT_RELAY_WS_URL = "wss://clawtile.moyi.vip/ws/plugin"
 $DEFAULT_LOCAL_PORT = 9750
 $RELAY_HTTP_URL = if ($env:GOCHAT_RELAY_HTTP_URL) { $env:GOCHAT_RELAY_HTTP_URL } else { $DEFAULT_RELAY_HTTP_URL }
 $RELAY_WS_URL = if ($env:GOCHAT_RELAY_WS_URL) { $env:GOCHAT_RELAY_WS_URL } else { $DEFAULT_RELAY_WS_URL }
@@ -840,7 +840,7 @@ function Show-Help {
     Write-Host "Options:"
     Write-Host "  -Relay             Relay mode (default)"
     Write-Host "  -Local             Local mode"
-    Write-Host "  -Code <code>       Claim a 6-digit relay connection code"
+    Write-Host "  -Code <code>       Claim a 6-digit legacy relay connection code"
     Write-Host "  -Mode <mode>       Set mode: relay or local"
     Write-Host "  -FromTarball <p>   Install from a local .tar.gz"
     Write-Host "  -Help              Show this help"

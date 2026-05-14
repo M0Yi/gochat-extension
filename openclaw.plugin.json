@@ -3,7 +3,7 @@
   "kind": "channel",
   "channels": ["gochat"],
   "name": "GoChat",
-  "description": "Custom chat backend. Local mode (built-in API, zero config) or relay mode (GoChat platform via WebSocket). Supports text, images, audio, video, and file attachments.",
+  "description": "Custom chat backend. Local mode, relay mode, or ClawTile account-level agent mode. Supports text, images, audio, video, and file attachments.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -13,8 +13,8 @@
         "properties": {
           "mode": {
             "type": "string",
-            "enum": ["local", "relay"],
-            "description": "local: built-in API server; relay: WebSocket relay via GoChat platform (default)"
+            "enum": ["local", "relay", "agent"],
+            "description": "local: built-in API server; relay: WebSocket relay via GoChat platform (default); agent: ClawTile account-level agent binding"
           },
           "webhookSecret": {
             "type": "string",
@@ -59,11 +59,11 @@
           },
           "modeSwitchAuthorization": {
             "type": "object",
-            "description": "One-time authorization grant consumed by the next explicit local/relay mode switch.",
+            "description": "One-time authorization grant consumed by the next explicit mode switch.",
             "properties": {
               "targetMode": {
                 "type": "string",
-                "enum": ["local", "relay"],
+                "enum": ["local", "relay", "agent"],
                 "description": "Which mode the next authorized switch may enter."
               },
               "issuedAt": {
@@ -127,6 +127,18 @@
           "channelId": {
             "type": "string",
             "description": "Channel ID from GoChat relay platform (auto-registered)"
+          },
+          "agentServerUrl": {
+            "type": "string",
+            "description": "ClawTile server URL for account-level agent mode"
+          },
+          "agentToken": {
+            "type": "string",
+            "description": "Bearer token returned by ClawTile agent pairing"
+          },
+          "agentTokenFile": {
+            "type": "string",
+            "description": "File containing the ClawTile agent bearer token"
           }
         }
       }

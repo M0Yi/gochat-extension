@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.4.9-plugin.39] - 2026-05-13
+
+### Added
+- Added ClawTile account-level agent mode with `openclaw gochat bind-agent --code <code>` for mini-program pairing codes.
+- Agent mode connects to `/api/agent/events`, reconciles pending recordings, asks OpenClaw to summarize completed transcripts, and writes summaries back to ClawTile.
+
+### Changed
+- Default GoChat/ClawTile server URLs now point to `https://clawtile.moyi.vip`.
+
 ## [2026.4.9-plugin.38] - 2026-04-10
 
 ### Added

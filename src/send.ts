@@ -1,6 +1,7 @@
 import { resolveMarkdownTableMode } from "openclaw/plugin-sdk/config-runtime";
 import { convertMarkdownTables } from "openclaw/plugin-sdk/text-runtime";
 import { resolveGoChatAccount } from "./accounts.js";
+import { writeAgentSummary } from "./gochat/agent-client.js";
 import { stripGoChatTargetPrefix } from "./normalize.js";
 import { getGoChatRuntime } from "./runtime.js";
 import type { CoreConfig, GoChatSendResult } from "./types.js";
@@ -189,6 +190,50 @@ async function sendRelay(
   return { messageId, conversationId };
 }
 
+function extractAgentRecordingId(conversationId: string): string {
+  const normalized = conversationId.trim();
+  const prefixes = ["agent-recording:", "recording:", "rec:"];
+  for (const prefix of prefixes) {
+    if (normalized.startsWith(prefix)) {
+      const id = normalized.slice(prefix.length).trim();
+      if (id) {
+        return id;
+      }
+    }
+  }
+  if (/^rec_[A-Za-z0-9_-]+$/.test(normalized)) {
+    return normalized;
+  }
+  throw new Error(`Unsupported GoChat agent conversation id: ${conversationId}`);
+}
+
+async function sendAgentSummary(
+  conversationId: string,
+  text: string,
+  account: ReturnType<typeof resolveGoChatAccount>,
+): Promise<GoChatSendResult> {
+  relayStatusReporter?.("syncing");
+  const recordingId = extractAgentRecordingId(conversationId);
+  try {
+    await writeAgentSummary({
+      account,
+      recordingId,
+      summary: text,
+      sourceLabel: "openclaw",
+    });
+  } catch (error) {
+    relayStatusReporter?.("error");
+    throw error;
+  }
+  recordGoChatOutboundActivity(account.accountId);
+  relayStatusReporter?.("idle");
+  return {
+    messageId: `agent-summary-${Date.now()}`,
+    conversationId,
+    timestamp: Date.now(),
+  };
+}
+
 export async function sendMessageGoChat(
   to: string,
   text: string,
@@ -214,6 +259,10 @@ export async function sendMessageGoChat(
 
   if (account.mode === "local") {
     return await sendDirect(conversationId, message, opts, account.accountId);
+  }
+
+  if (account.mode === "agent") {
+    return await sendAgentSummary(conversationId, message, account);
   }
 
   return await sendRelay(conversationId, message, opts, account.accountId, account.relayPlatformUrl);

@@ -6,13 +6,13 @@ set -euo pipefail
 # Supports: macOS, Linux (amd64/arm64), WSL
 # ──────────────────────────────────────────────
 
-VERSION="2026.4.9-plugin.38"
+VERSION="2026.4.9-plugin.39"
 EXTENSION_NAME="gochat"
 OPENCLAW_MIN_VERSION="2026.3.28"
 REPO_URL="https://github.com/M0Yi/gochat-extension.git"
 REPO_TARBALL_URL="https://codeload.github.com/M0Yi/gochat-extension/tar.gz/refs/heads/main"
-DEFAULT_RELAY_HTTP_URL="https://fund.moyi.vip"
-DEFAULT_RELAY_WS_URL="wss://fund.moyi.vip/ws/plugin"
+DEFAULT_RELAY_HTTP_URL="https://clawtile.moyi.vip"
+DEFAULT_RELAY_WS_URL="wss://clawtile.moyi.vip/ws/plugin"
 RELAY_HTTP_URL="${GOCHAT_RELAY_HTTP_URL:-${DEFAULT_RELAY_HTTP_URL}}"
 RELAY_WS_URL="${GOCHAT_RELAY_WS_URL:-${DEFAULT_RELAY_WS_URL}}"
 
@@ -1028,7 +1028,7 @@ main() {
         echo "Options:"
         echo "  --relay, -r            Relay mode (default, auto-register)"
         echo "  --local, -l            Local mode"
-        echo "  --code <code>          Claim a 6-digit relay connection code"
+        echo "  --code <code>          Claim a 6-digit legacy relay connection code"
         echo "  --mode <mode>          Set mode: local or relay"
         echo "  --from-tarball <path>  Install from .tar.gz"
         echo "  --help, -h             Show this help"

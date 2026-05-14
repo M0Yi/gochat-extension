@@ -3,7 +3,9 @@ import { gochatPlugin } from "./src/channel.js";
 import { setGoChatRuntime } from "./src/runtime.js";
 import { createGoChatTaskTool } from "./src/task-tools.js";
 import { resolveGoChatAccount } from "./src/accounts.js";
-import type { CoreConfig } from "./src/types.js";
+import { exchangeAgentPairCode } from "./src/gochat/agent-client.js";
+import { setGoChatAccountConfig } from "./src/setup-core.js";
+import { DEFAULT_CLAWTILE_HTTP_URL, type CoreConfig } from "./src/types.js";
 import { DEFAULT_MODE_SWITCH_AUTH_TTL_MINUTES, grantGoChatModeSwitchAuthorization } from "./src/mode-switch-authorization.js";
 import { approveGoChatLocalRepair, ensureGoChatGatewayAccess } from "./src/gateway-access.js";
 import { loadConfig, writeConfigFile } from "openclaw/plugin-sdk/config-runtime";
@@ -70,6 +72,11 @@ export default defineChannelPluginEntry({
                 console.log(`    Channel ID:    ${account.channelId || "(not set)"}`);
                 console.log(`    Relay URL:     ${account.relayPlatformUrl}`);
                 console.log(`    Secret Key:    ${account.secret || "(not set)"}`);
+              } else if (account.mode === "agent") {
+                console.log("  Agent Configuration:");
+                console.log(`    Server URL:    ${account.agentServerUrl}`);
+                console.log(`    Token Source:  ${account.secretSource}`);
+                console.log(`    Token Prefix:  ${account.secret ? account.secret.slice(0, 13) : "(not set)"}`);
               } else {
                 console.log("  Local Configuration:");
                 console.log(`    Host:          ${account.directHost}`);
@@ -87,16 +94,83 @@ export default defineChannelPluginEntry({
           });
 
         gochatCmd
+          .command("bind-agent")
+          .description("Bind this OpenClaw plugin to a ClawTile account using the 6-digit mini-program pairing code")
+          .requiredOption("--code <code>", "6-digit pairing code from the ClawTile mini-program")
+          .option("--server <url>", "ClawTile server URL", DEFAULT_CLAWTILE_HTTP_URL)
+          .option("-a, --account <accountId>", "Account ID (default: default account)")
+          .option("--name <name>", "Display name shown in ClawTile", "OpenClaw")
+          .option("--json", "Output JSON result")
+          .action(async (options) => {
+            const code = String(options.code ?? "").trim();
+            const serverUrl = String(options.server ?? DEFAULT_CLAWTILE_HTTP_URL).trim().replace(/\/+$/, "");
+            if (!/^\d{6}$/.test(code)) {
+              console.error("\n✗ Invalid pairing code. Use the 6-digit code from the mini-program.\n");
+              process.exit(1);
+            }
+
+            try {
+              const accountId = options.account || undefined;
+              const currentCfg = loadConfig() as CoreConfig;
+              const result = await exchangeAgentPairCode({
+                serverUrl,
+                code,
+                displayName: String(options.name ?? "OpenClaw"),
+                version: "gochat-plugin",
+              });
+              const nextCfg = setGoChatAccountConfig(currentCfg, accountId ?? "default", {
+                enabled: true,
+                mode: "agent",
+                agentServerUrl: serverUrl,
+                agentToken: result.token,
+                dmPolicy: "open",
+                blockStreaming: true,
+              });
+              await writeConfigFile(nextCfg as Parameters<typeof writeConfigFile>[0]);
+
+              const payload = {
+                accountId: accountId ?? "default",
+                mode: "agent",
+                serverUrl,
+                tokenPrefix: result.agent?.tokenPrefix || result.token.slice(0, 13),
+                endpoints: result.endpoints,
+                user: result.user,
+              };
+              if (options.json) {
+                console.log(JSON.stringify(payload, null, 2));
+                return;
+              }
+
+              console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+              console.log("  ClawTile Agent Bound");
+              console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+              console.log(`  Account ID:      ${payload.accountId}`);
+              console.log(`  Server URL:      ${serverUrl}`);
+              console.log(`  Token Prefix:    ${payload.tokenPrefix}`);
+              if (result.endpoints?.sse) {
+                console.log(`  Events:          ${result.endpoints.sse}`);
+              }
+              console.log("\nStart or restart OpenClaw gateway to use the new agent binding.");
+              console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+            } catch (error) {
+              console.error("\n✗ Failed to bind ClawTile agent:");
+              console.error(`  ${error instanceof Error ? error.message : String(error)}`);
+              console.error("");
+              process.exit(1);
+            }
+          });
+
+        gochatCmd
           .command("authorize-mode-switch")
           .description("Authorize the next explicit mode switch for a GoChat account")
-          .requiredOption("--mode <mode>", "Target mode: local or relay")
+          .requiredOption("--mode <mode>", "Target mode: local, relay, or agent")
           .option("-a, --account <accountId>", "Account ID (default: default account)")
           .option("--ttl-minutes <minutes>", "Authorization lifetime in minutes", String(DEFAULT_MODE_SWITCH_AUTH_TTL_MINUTES))
           .option("--json", "Output JSON result")
           .action(async (options) => {
             const rawMode = String(options.mode ?? "").trim().toLowerCase();
-            if (rawMode !== "local" && rawMode !== "relay") {
-              console.error("\n✗ Invalid mode. Use --mode local or --mode relay.\n");
+            if (rawMode !== "local" && rawMode !== "relay" && rawMode !== "agent") {
+              console.error("\n✗ Invalid mode. Use --mode local, --mode relay, or --mode agent.\n");
               process.exit(1);
             }
 
@@ -221,6 +295,11 @@ export default defineChannelPluginEntry({
           {
             name: "gochat show-credentials",
             description: "Display connection ID and secret key",
+            hasSubcommands: false,
+          },
+          {
+            name: "gochat bind-agent",
+            description: "Bind OpenClaw to ClawTile using a mini-program pairing code",
             hasSubcommands: false,
           },
           {

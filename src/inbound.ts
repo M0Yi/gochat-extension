@@ -625,12 +625,20 @@ export async function handleGoChatInbound(params: {
   const audioTranscriptContext = buildAudioTranscriptContext(audioTranscripts);
   const bodyText = [rawBody, mediaPlaceholder, audioTranscriptContext].filter(Boolean).join("\n\n").trim();
 
-  const currentPermissionStatus = await maybePushSubagentPermissionStatus({
-    conversationId,
-    accountId: account.accountId,
-    statusSink,
-    runtime,
-  });
+  const currentPermissionStatus = account.mode === "agent"
+    ? {
+        state: "unknown" as const,
+        summary: "Subagent permission status is not used for ClawTile agent mode.",
+        detailSignature: "agent-mode",
+        approvalState: "unknown" as const,
+        approvalLabel: "agent-mode",
+      }
+    : await maybePushSubagentPermissionStatus({
+        conversationId,
+        accountId: account.accountId,
+        statusSink,
+        runtime,
+      });
 
   const body = core.channel.reply.formatAgentEnvelope({
     channel: "GoChat",
