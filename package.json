@@ -1,6 +1,6 @@
 {
   "name": "@m0yi/gochat",
-  "version": "2026.5.14-plugin.41",
+  "version": "2026.5.14-plugin.42",
   "description": "GoChat channel plugin and skills bridge for OpenClaw and Hermes Agent",
   "type": "module",
   "dependencies": {

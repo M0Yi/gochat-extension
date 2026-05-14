@@ -5,6 +5,7 @@ A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) and [Herme
 - **Local mode** — Zero-config built-in HTTP API server on port 9750
 - **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://clawtile.moyi.vip/ws/plugin`
 - **Agent mode** — account-level ClawTile agent binding via the mini-program 6-digit code
+- **Hermes plugin mode** — `hermes plugins install M0Yi/gochat-extension --enable` adds native `hermes gochat ...` commands
 - **Hermes skills mode** — pure skills + MCP/SSE bridge for [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
 ## Features
@@ -55,6 +56,40 @@ Bind OpenClaw as the account-level ClawTile agent:
 
 ```bash
 openclaw gochat bind-agent --code 123456 --server https://clawtile.moyi.vip
+```
+
+## Hermes Agent Plugin Install
+
+Install and enable the Hermes-native plugin:
+
+```bash
+hermes plugins install M0Yi/gochat-extension --enable
+```
+
+Configure ClawTile Agent MCP tools:
+
+```bash
+hermes gochat mcp-configure
+```
+
+Run the online bridge in the foreground:
+
+```bash
+hermes gochat bridge-run
+```
+
+On macOS, install the online bridge as a LaunchAgent:
+
+```bash
+hermes gochat bridge-install-launchd
+```
+
+Useful plugin commands:
+
+```bash
+hermes gochat status
+hermes gochat install-skills
+hermes gochat bridge-run --once rec_xxx
 ```
 
 ---
@@ -196,6 +231,12 @@ Hermes Agent online bridge:
 
 ```bash
 hermes mcp add clawtile-agent --url https://clawtile.moyi.vip/api/agent/mcp --auth header
+```
+
+If you installed the Hermes plugin, prefer:
+
+```bash
+hermes gochat mcp-configure
 ```
 
 For an always-on pure-skills bridge that listens for completed ClawTile recordings and runs `hermes -z` automatically:

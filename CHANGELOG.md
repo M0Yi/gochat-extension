@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.5.14-plugin.42] - 2026-05-14
+
+### Added
+- Added Hermes-native plugin support with root `plugin.yaml` and `__init__.py`, so users can install with `hermes plugins install M0Yi/gochat-extension --enable`.
+- Added the `hermes gochat` CLI command group with `status`, `mcp-configure`, `bridge-run`, `bridge-install-launchd`, and `install-skills` commands.
+- Registered the Hermes plugin-owned skill `gochat:clawtile-hermes-online` for explicit plugin skill loading.
+
 ## [2026.5.14-plugin.41] - 2026-05-14
 
 ### Added
