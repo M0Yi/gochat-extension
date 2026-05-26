@@ -21,7 +21,7 @@ This skill provides two integration paths:
 Default server:
 
 ```bash
-https://clawtile.moyi.vip
+https://voinko.com
 ```
 
 ## MCP Tool Mode
@@ -29,7 +29,7 @@ https://clawtile.moyi.vip
 Add the ClawTile Agent MCP endpoint to Hermes:
 
 ```bash
-hermes mcp add clawtile-agent --url https://clawtile.moyi.vip/api/agent/mcp --auth header
+hermes mcp add clawtile-agent --url https://voinko.com/api/agent/mcp --auth header
 ```
 
 When prompted for the API key / bearer token, paste the ClawTile agent token. Hermes stores it in `~/.hermes/.env` and writes the MCP server config to `~/.hermes/config.yaml`.
@@ -49,7 +49,7 @@ Run the bridge in the foreground:
 
 ```bash
 CLAWTILE_TOKEN="ct_a_xxx" \
-CLAWTILE_BASE="https://clawtile.moyi.vip" \
+CLAWTILE_BASE="https://voinko.com" \
 bash ~/.hermes/skills/clawtile-hermes-online/scripts/clawtile_hermes_bridge.sh
 ```
 

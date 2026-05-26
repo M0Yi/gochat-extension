@@ -15,7 +15,7 @@ hermes gochat mcp-configure
 If you have a 6-digit ClawTile mini-program pairing code, use it directly:
 
 ```bash
-hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip
+hermes gochat mcp-configure --code 123456 --server https://voinko.com
 ```
 
 For always-on processing of completed ClawTile recordings:

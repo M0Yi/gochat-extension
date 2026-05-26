@@ -3,7 +3,7 @@
 A channel plugin for [OpenClaw](https://github.com/openclaw/openclaw) and [Hermes Agent](https://github.com/NousResearch/hermes-agent) that enables custom chat backend integration via HTTP webhook, MCP, or a pure-skills online bridge. Supports these operation modes:
 
 - **Local mode** — Zero-config built-in HTTP API server on port 9750
-- **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://clawtile.moyi.vip/ws/plugin`
+- **Relay mode** — WebSocket relay connection to the GoChat platform at `wss://voinko.com/ws/plugin`
 - **Agent mode** — account-level ClawTile agent binding via the mini-program 6-digit code
 - **Hermes plugin mode** — `hermes plugins install M0Yi/gochat-extension --enable` adds native `hermes gochat ...` commands
 - **Hermes skills mode** — pure skills + MCP/SSE bridge for [Hermes Agent](https://github.com/NousResearch/hermes-agent)
@@ -53,7 +53,7 @@ Please install the GoChat plugin for Hermes Agent from https://github.com/M0Yi/g
 Use Hermes plugin mode, not the standalone skills-only flow:
 hermes plugins install M0Yi/gochat-extension --enable
 If I provide a ClawTile mini-program pairing code, configure with:
-hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip
+hermes gochat mcp-configure --code 123456 --server https://voinko.com
 Then show me the next command to start the online bridge.
 Do not store my token in shell history; use the pairing code or Hermes .env flow.
 ```
@@ -64,7 +64,7 @@ For a Chinese assistant prompt:
 请帮我从 https://github.com/M0Yi/gochat-extension 安装 GoChat 插件。
 如果是 OpenClaw，请使用默认 relay 模式安装并验证插件目录。
 如果是 Hermes Agent，请使用插件模式安装：hermes plugins install M0Yi/gochat-extension --enable，
-如果我提供了小程序配对码，请执行 hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip，
+如果我提供了小程序配对码，请执行 hermes gochat mcp-configure --code 123456 --server https://voinko.com，
 最后告诉我如何启动 bridge。
 不要自动启动服务，不要修改无关配置，不要把 token 明文写进 shell 历史。
 ```
@@ -92,7 +92,7 @@ curl -sL https://raw.githubusercontent.com/M0Yi/gochat-extension/main/install.sh
 Bind OpenClaw as the account-level ClawTile agent:
 
 ```bash
-openclaw gochat bind-agent --code 123456 --server https://clawtile.moyi.vip
+openclaw gochat bind-agent --code 123456 --server https://voinko.com
 ```
 
 ## Hermes Agent Plugin Install
@@ -112,7 +112,7 @@ hermes gochat mcp-configure
 Or bind directly with a 6-digit pairing code from the ClawTile mini-program:
 
 ```bash
-hermes gochat mcp-configure --code 123456 --server https://clawtile.moyi.vip
+hermes gochat mcp-configure --code 123456 --server https://voinko.com
 ```
 
 Run the online bridge in the foreground:
@@ -152,7 +152,7 @@ hermes gochat bridge-run --once rec_xxx
        - Run: node --version && npm --version
        - If the user mentions Hermes Agent, prefer Hermes plugin mode:
            hermes plugins install M0Yi/gochat-extension --enable
-           hermes gochat mcp-configure --code <MINI_PROGRAM_PAIR_CODE> --server https://clawtile.moyi.vip
+           hermes gochat mcp-configure --code <MINI_PROGRAM_PAIR_CODE> --server https://voinko.com
            hermes gochat status
          Then show:
            hermes gochat bridge-run
@@ -272,7 +272,7 @@ Relay mode connects to the GoChat platform WebSocket relay.
 channels:
   gochat:
     mode: relay
-    relayPlatformUrl: wss://clawtile.moyi.vip/ws/plugin
+    relayPlatformUrl: wss://voinko.com/ws/plugin
 ```
 
 The installer also copies bundled GoChat skills into `~/.openclaw/skills`. If Hermes Agent is installed or `HERMES_HOME` is set, it also copies the same skills into `~/.hermes/skills`.
@@ -280,7 +280,7 @@ The installer also copies bundled GoChat skills into `~/.openclaw/skills`. If He
 Hermes Agent online bridge:
 
 ```bash
-hermes mcp add clawtile-agent --url https://clawtile.moyi.vip/api/agent/mcp --auth header
+hermes mcp add clawtile-agent --url https://voinko.com/api/agent/mcp --auth header
 ```
 
 If you installed the Hermes plugin, prefer:
@@ -343,7 +343,7 @@ channels:
     # Extra trusted hosts for inbound attachment fetches.
     # The relay host from relayPlatformUrl is trusted automatically.
     trustedAttachmentHosts:
-      - clawtile.moyi.vip
+      - voinko.com
 
     # Optional local transcription for inbound audio attachments
     localAudioTranscription:

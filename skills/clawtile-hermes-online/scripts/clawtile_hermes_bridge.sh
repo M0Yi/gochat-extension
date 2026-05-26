@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u -o pipefail
 
-: "${CLAWTILE_BASE:=https://clawtile.moyi.vip}"
+: "${CLAWTILE_BASE:=https://voinko.com}"
 : "${CLAWTILE_TOKEN:?CLAWTILE_TOKEN env var is required (Bearer ct_a_xxx)}"
 : "${HERMES_BIN:=hermes}"
 : "${BRIDGE_LOG:=$HOME/.clawtile-hermes-bridge.log}"
@@ -269,9 +269,52 @@ run_once() {
   process_recording "$rid" ""
 }
 
+# reconcile_pending 拉一次还没有总结的已转写录音，逐条处理。SSE 是内存事件，
+# 后端不会重放；bridge 重启、网络断线、STT 完成时 bridge 不在线都会让事件
+# 永久丢失。每次进入 / 重连 SSE 之前调一次这个就能补齐。
+# 依赖 already_seen 去重，避免和 SSE 同时收到时重复处理。
+reconcile_pending() {
+  local resp rid title
+  resp="$(curl --silent --show-error --fail --connect-timeout 15 \
+    -H "Authorization: Bearer ${CLAWTILE_TOKEN}" \
+    "$(api_url "/recordings?summary_state=none&status=completed&limit=20")" 2>>"$BRIDGE_LOG")" || {
+    log "reconcile: list_recordings failed"
+    return 1
+  }
+  if [ -z "$resp" ]; then
+    return 0
+  fi
+  # 解析 recordings[] 里的 id + title，逐行输出 "id\ttitle"
+  while IFS=$'\t' read -r rid title; do
+    [ -z "$rid" ] && continue
+    if already_seen "$rid"; then
+      continue
+    fi
+    log "reconcile: catching up pending recording=${rid}"
+    process_recording "$rid" "$title" &
+  done < <(printf '%s' "$resp" | python3 - <<'PY' 2>>"$BRIDGE_LOG" || true
+import json
+import sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for rec in (data.get("recordings") or []):
+    rid = (rec.get("id") or "").strip()
+    if not rid:
+        continue
+    title = (rec.get("title") or "").strip()
+    print(f"{rid}\t{title}")
+PY
+)
+}
+
 run_loop() {
   local backoff=3 max_backoff=30 ev="" evid="" data rid title
   log "bridge starting; SSE_URL=${SSE_URL} token=${CLAWTILE_TOKEN:0:13}... hermes=${HERMES_BIN}"
+  # 启动时先补齐：bridge 不在线那段时间堆积的 summary_state=none 录音
+  # 可能永远等不到 SSE 事件了（后端 PubSub 不持久化）。
+  reconcile_pending || true
   while true; do
     ev=""
     evid=""
@@ -336,6 +379,8 @@ run_loop() {
     if [[ "$backoff" -gt "$max_backoff" ]]; then
       backoff="$max_backoff"
     fi
+    # 每次准备重连 SSE 之前补一遍：断线期间错过的事件就靠它兜底。
+    reconcile_pending || true
   done
 }
 

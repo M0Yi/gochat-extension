@@ -2,7 +2,7 @@
 set -euo pipefail
 
 : "${CLAWTILE_TOKEN:?CLAWTILE_TOKEN env var is required (Bearer ct_a_xxx)}"
-: "${CLAWTILE_BASE:=https://clawtile.moyi.vip}"
+: "${CLAWTILE_BASE:=https://voinko.com}"
 : "${HERMES_BIN:=hermes}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then

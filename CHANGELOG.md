@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.5.26-plugin.45] - 2026-05-26
+
+### Fixed
+- `bridge-run` now reconciles `summary_state=none` recordings on startup and after every SSE reconnect by calling `GET /api/agent/recordings?summary_state=none&status=completed` and processing each result. Previously SSE was the only source of "process this recording" signals, so any `recording.transcribed` event that fired while the bridge was offline (or during a reconnect) was lost forever and the recording stayed without a summary.
+- Default server URL switched from `clawtile.moyi.vip` to `voinko.com` across the plugin code (`__init__.py` DEFAULT_SERVER, `src/types.ts`, `skills/clawtile-hermes-online/scripts/clawtile_hermes_bridge.sh`, install scripts, README/after-install docs). The old domain is no longer reachable.
+
 ## [2026.5.14-plugin.44] - 2026-05-14
 
 ### Added
